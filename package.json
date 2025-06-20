@@ -1,0 +1,38 @@
+{
+  "name": "kubernetes-mcp-server",
+  "version": "1.0.0",
+  "description": "自開發的 Kubernetes MCP Server",
+  "type": "module",
+  "main": "src/server.js",
+  "bin": {
+    "k8s-mcp-server": "./src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "start:http": "node src/server.js --http",
+    "dev": "NODE_ENV=development LOG_LEVEL=debug node src/server.js",
+    "test": "node test.js",
+    "docker:build": "docker build -t k8s-mcp-server:latest .",
+    "docker:run": "docker run -p 3000:3000 --name k8s-mcp-server k8s-mcp-server:latest",
+    "docker:stop": "docker stop k8s-mcp-server && docker rm k8s-mcp-server",
+    "docker:logs": "docker logs k8s-mcp-server",
+    "docker:shell": "docker exec -it k8s-mcp-server sh"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.0",
+    "express": "^4.18.2",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {},
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "mcp",
+    "kubernetes",
+    "kubectl",
+    "server"
+  ],
+  "author": "danlio",
+  "license": "MIT"
+}
