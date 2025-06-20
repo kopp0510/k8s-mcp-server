@@ -8,9 +8,13 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import express from 'express';
-import { execSync } from 'child_process';
 import { z } from 'zod';
 import { logger } from './utils/logger.js';
+
+// 匯入工具類別
+import { KubectlGetTool } from './tools/kubectl-get.js';
+import { KubectlLogsTool } from './tools/kubectl-logs.js';
+import { KubectlDescribeTool } from './tools/kubectl-describe.js';
 
 // 創建 MCP Server 實例
 const server = new McpServer({
@@ -18,128 +22,88 @@ const server = new McpServer({
   version: "1.0.0"
 });
 
-// 註冊 kubectl get pods 工具
+// 初始化工具實例
+const kubectlGetTool = new KubectlGetTool();
+const kubectlLogsTool = new KubectlLogsTool();
+const kubectlDescribeTool = new KubectlDescribeTool();
+
+// 註冊工具到 MCP Server
 server.tool(
-  "kubectl_get_pods",
-  {
-    namespace: z.string().optional().describe("命名空間 (可選，預設為 default)")
-  },
-  async ({ namespace = 'default' }) => {
-    try {
-      const cmd = `kubectl get pods -n ${namespace} -o json`;
+  kubectlGetTool.name,
+  kubectlGetTool.getDefinition().inputSchema,
+  async (args) => {
+    return await kubectlGetTool.execute(args);
+  }
+);
 
-      logger.info(`執行指令: ${cmd}`);
+server.tool(
+  kubectlLogsTool.name,
+  kubectlLogsTool.getDefinition().inputSchema,
+  async (args) => {
+    return await kubectlLogsTool.execute(args);
+  }
+);
 
-      const result = execSync(cmd, {
-        encoding: 'utf8',
-        timeout: 30000
-      });
-
-      const data = JSON.parse(result);
-
-      let output = `📦 找到 ${data.items.length} 個 Pod (命名空間: ${namespace}):\n\n`;
-
-      data.items.forEach(pod => {
-        const status = pod.status.phase;
-        const name = pod.metadata.name;
-        const ready = pod.status.containerStatuses
-          ? pod.status.containerStatuses.filter(c => c.ready).length + '/' + pod.status.containerStatuses.length
-          : '0/0';
-
-        output += `• ${name}\n`;
-        output += `  狀態: ${status}\n`;
-        output += `  Ready: ${ready}\n`;
-        output += `  建立時間: ${pod.metadata.creationTimestamp}\n\n`;
-      });
-
-      return {
-        content: [{ type: "text", text: output }]
-      };
-    } catch (error) {
-      logger.error('取得 Pod 列表失敗:', error);
-      return {
-        content: [{
-          type: "text",
-          text: `❌ 錯誤: ${error.message}`
-        }],
-        isError: true
-      };
-    }
+server.tool(
+  kubectlDescribeTool.name,
+  kubectlDescribeTool.getDefinition().inputSchema,
+  async (args) => {
+    return await kubectlDescribeTool.execute(args);
   }
 );
 
 // SSE 連接管理
 const sseConnections = new Map();
 
+// 創建可用工具列表
+const availableTools = [
+  kubectlGetTool.getDefinition(),
+  kubectlLogsTool.getDefinition(),
+  kubectlDescribeTool.getDefinition()
+];
+
 // 創建 MCP 訊息處理器
 function createMCPHandler() {
   return async (message) => {
     try {
-      // 這裡應該調用 MCP Server 的處理器
-      // 但由於 SDK 架構限制，我們先返回一個簡單的回應
+      // 處理工具列表請求
       if (message.method === 'tools/list') {
         return {
           jsonrpc: '2.0',
           id: message.id,
           result: {
-            tools: [
-              {
-                name: 'kubectl_get_pods',
-                description: '取得 Kubernetes Pod 列表',
-                inputSchema: {
-                  type: 'object',
-                  properties: {
-                    namespace: {
-                      type: 'string',
-                      description: '命名空間 (可選，預設為 default)'
-                    }
-                  }
-                }
-              }
-            ]
+            tools: availableTools
           }
         };
       }
 
-      if (message.method === 'tools/call' && message.params?.name === 'kubectl_get_pods') {
-        const namespace = message.params?.arguments?.namespace || 'default';
-        const cmd = `kubectl get pods -n ${namespace} -o json`;
+      // 處理工具執行請求
+      if (message.method === 'tools/call') {
+        const toolName = message.params?.name;
+        const toolArgs = message.params?.arguments || {};
 
-        try {
-          const result = execSync(cmd, { encoding: 'utf8', timeout: 30000 });
-          const data = JSON.parse(result);
+        logger.info(`執行工具: ${toolName}`, toolArgs);
 
-          let output = `📦 找到 ${data.items.length} 個 Pod (命名空間: ${namespace}):\n\n`;
-          data.items.forEach(pod => {
-            const status = pod.status.phase;
-            const name = pod.metadata.name;
-            const ready = pod.status.containerStatuses
-              ? pod.status.containerStatuses.filter(c => c.ready).length + '/' + pod.status.containerStatuses.length
-              : '0/0';
+        let result;
+                 switch (toolName) {
+           case 'kubectl_get':
+             result = await kubectlGetTool.execute(toolArgs);
+             break;
+           case 'kubectl_logs':
+             result = await kubectlLogsTool.execute(toolArgs);
+             break;
+           case 'kubectl_describe':
+             result = await kubectlDescribeTool.execute(toolArgs);
+             break;
+           default:
+             throw new Error(`未知的工具: ${toolName}`);
+         }
 
-            output += `• ${name}\n`;
-            output += `  狀態: ${status}\n`;
-            output += `  Ready: ${ready}\n`;
-            output += `  建立時間: ${pod.metadata.creationTimestamp}\n\n`;
-          });
-
-          return {
-            jsonrpc: '2.0',
-            id: message.id,
-            result: {
-              content: [{ type: "text", text: output }]
-            }
-          };
-        } catch (error) {
-          return {
-            jsonrpc: '2.0',
-            id: message.id,
-            error: {
-              code: -32603,
-              message: `執行失敗: ${error.message}`
-            }
-          };
-        }
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: result
+        };
       }
 
       // 處理初始化請求
@@ -169,13 +133,15 @@ function createMCPHandler() {
           message: `Method not found: ${message.method}`
         }
       };
+
     } catch (error) {
+      logger.error('MCP 訊息處理失敗:', error);
       return {
         jsonrpc: '2.0',
         id: message.id,
         error: {
           code: -32603,
-          message: `Internal error: ${error.message}`
+          message: `執行錯誤: ${error.message}`
         }
       };
     }
@@ -202,7 +168,11 @@ async function main() {
           service: 'k8s-mcp-server',
           version: '1.0.0',
           timestamp: new Date().toISOString(),
-          mode: 'sse'
+          mode: 'sse',
+          tools: availableTools.map(tool => ({
+            name: tool.name,
+            description: tool.description
+          }))
         });
       });
 
@@ -289,6 +259,7 @@ async function main() {
         logger.info(`📡 SSE 端點: http://localhost:${port}/sse (n8n 連接這裡)`);
         logger.info(`📨 訊息端點: http://localhost:${port}/messages`);
         logger.info(`💚 健康檢查: http://localhost:${port}/health`);
+        logger.info(`🛠️  可用工具: ${availableTools.map(t => t.name).join(', ')}`);
         logger.info(`ℹ️  SSE 模式 - 專為 n8n 設計`);
       });
     } else {
@@ -297,6 +268,7 @@ async function main() {
       const transport = new StdioServerTransport();
       await server.connect(transport);
       logger.info('✅ MCP Server 已啟動並監聽 stdio');
+      logger.info(`🛠️  可用工具: ${availableTools.map(t => t.name).join(', ')}`);
     }
   } catch (error) {
     logger.error('❌ MCP Server 啟動失敗:', error);
