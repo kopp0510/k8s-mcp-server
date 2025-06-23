@@ -183,6 +183,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_scale_deployment`
 - **Parameters**: `{"deploymentName": "my-web-app", "replicas": 3, "namespace": "default"}`
 
+**重啟 Deployment**：
+- **Tool Name**: `kubectl_restart_deployment`
+- **Parameters**: `{"deploymentName": "my-web-app", "namespace": "default"}`
+
 ## 可用工具
 
 ### kubectl_get
@@ -1555,6 +1559,113 @@ Deployment 擴縮操作結果
 - 建議先使用 `kubectl_get` 檢查當前 Deployment 狀態
 - 對於生產環境，建議設定較長的 timeout 值
 
+### kubectl_restart_deployment
+
+安全重啟 Kubernetes Deployment，觸發滾動更新來重新創建所有 Pod，適用於應用程式更新、設定變更或故障排除。
+
+**參數**：
+- `deploymentName` (必需): Deployment 名稱
+- `namespace` (可選): Kubernetes 命名空間，預設為 "default"
+- `wait` (可選): 是否等待重啟完成，預設為 false
+- `timeout` (可選): 等待超時時間（秒，30-1800），預設為 300
+
+**範例 60 - 基本重啟**：
+```json
+{
+  "deploymentName": "my-web-app",
+  "namespace": "default"
+}
+```
+
+**範例 61 - 重啟並等待完成**：
+```json
+{
+  "deploymentName": "my-api-service",
+  "namespace": "production",
+  "wait": true,
+  "timeout": 600
+}
+```
+
+**範例 62 - 快速重啟（開發環境）**：
+```json
+{
+  "deploymentName": "my-dev-app",
+  "namespace": "development",
+  "wait": true,
+  "timeout": 120
+}
+```
+
+**輸出範例**：
+```
+Deployment 重啟操作結果
+==================================================
+
+操作摘要：
+• Deployment: my-web-app
+• 命名空間: default
+• 副本數: 3
+• 操作類型: 滾動重啟
+
+版本資訊：
+• 重啟前 Generation: 15
+• 重啟後 Generation: 16
+• 版本變化: 已更新
+
+狀態對比：
+┌────────────────────┬──────────┬──────────┐
+│ 項目               │ 重啟前   │ 重啟後   │
+├────────────────────┼──────────┼──────────┤
+│ Generation         │ 15       │ 16       │
+│ Observed Generation│ 15       │ 16       │
+│ 總副本數           │ 3        │ 3        │
+│ 已更新副本數       │ 3        │ 3        │
+│ 就緒副本數         │ 3        │ 3        │
+│ 可用副本數         │ 3        │ 3        │
+└────────────────────┴──────────┴──────────┘
+
+操作結果：
+[成功] Deployment 規格已成功更新，觸發滾動重啟
+[成功] Controller 已觀察到最新規格
+[成功] 所有 Pod 已更新到最新版本
+[成功] 所有 Pod 已就緒並可用
+
+提示：
+• 此操作未等待完成，Pod 可能仍在重啟中
+• 使用 kubectl_get 檢查 Deployment 狀態：{"resource": "deployments", "namespace": "default", "name": "my-web-app"}
+• 使用 kubectl_get 檢查 Pod 狀態：{"resource": "pods", "namespace": "default"}
+• 使用 kubectl_describe 查看詳細資訊：{"resource": "deployment", "name": "my-web-app", "namespace": "default"}
+• 使用 kubectl_logs 查看新 Pod 日誌
+```
+
+**重啟機制說明**：
+- **滾動重啟**: 使用 `kubectl rollout restart` 命令，逐步替換 Pod
+- **零停機時間**: 確保服務可用性，新 Pod 就緒後才終止舊 Pod
+- **版本追蹤**: 透過 Generation 和 ObservedGeneration 追蹤重啟進度
+- **狀態驗證**: 確認所有 Pod 已更新並處於就緒狀態
+
+**使用場景**：
+- 應用程式映像更新後重啟
+- ConfigMap 或 Secret 變更後重啟
+- 解決 Pod 異常或效能問題
+- 觸發應用程式重新載入設定
+- 故障排除和除錯
+
+**安全特性**：
+- 自動驗證 Deployment 是否存在
+- 支援等待機制確保重啟完成
+- 詳細的版本變化追蹤
+- 完整的狀態對比和進度報告
+- 智慧錯誤處理和格式化輸出
+
+**提示**:
+- 設定 `wait: true` 可確保重啟操作完全完成
+- 重啟會觸發所有 Pod 重新創建，可能需要時間拉取映像
+- 建議在非高峰時段執行重啟操作
+- 使用 `kubectl_logs` 查看新 Pod 的啟動日誌
+- 對於關鍵服務，建議設定較長的 timeout 值
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1752,7 +1863,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (24項)
+### 已完成 (25項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1777,6 +1888,7 @@ npm start
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] **Scale Deployment** - 擴縮 Deployment 副本數量
+- [x] **Restart Deployment** - 重啟 Deployment（滾動重啟）
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
@@ -1789,9 +1901,8 @@ npm start
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
 
-#### 操作類 (7項)
+#### 操作類 (6項)
 - [ ] **Edit HPA** - 編輯 HorizontalPodAutoscaler
-- [ ] **Restart Deployment** - 重啟 Deployment
 - [ ] **Delete Pod** - 刪除 Pod
 - [ ] **Apply YAML** - 應用 YAML 配置
 - [ ] **Create Resource** - 創建資源
@@ -1817,10 +1928,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 24項核心功能
-- **待開發**: 21項功能
+- **已完成**: 25項核心功能
+- **待開發**: 20項功能
 - **總計**: 45項功能
-- **完成度**: 53.3%
+- **完成度**: 55.6%
 
 ## 授權
 
