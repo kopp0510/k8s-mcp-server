@@ -127,6 +127,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "services", "namespace": "default"}`
 
+**取得 ReplicaSet 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "replicasets", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -142,8 +146,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments" 或 "services"
-- `namespace` (可選): Kubernetes 命名空間，適用於 pods, deployments 和 services，預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services" 或 "replicasets"
+- `namespace` (可選): Kubernetes 命名空間，適用於 pods, deployments, services 和 replicasets，預設為 "default"
 - `name` (可選): 特定資源名稱
 
 **範例 1 - 取得所有 Pod**：
@@ -201,6 +205,23 @@ SSE 模式 - 專為 n8n 設計
   "resource": "services",
   "namespace": "kube-system",
   "name": "kube-dns"
+}
+```
+
+**範例 8 - 取得所有 ReplicaSet**：
+```json
+{
+  "resource": "replicasets",
+  "namespace": "default"
+}
+```
+
+**範例 9 - 取得特定 ReplicaSet**：
+```json
+{
+  "resource": "replicasets",
+  "namespace": "production",
+  "name": "my-app-7c8d9f5b6"
 }
 ```
 
@@ -288,6 +309,32 @@ SSE 模式 - 專為 n8n 設計
   類型: ClusterIP
   Cluster IP: 10.96.123.47
   端口: 5432/TCP -> 5432/TCP
+  建立時間: 2024-01-01T09:30:00Z
+```
+
+**ReplicaSet 輸出範例**：
+```
+找到 3 個 ReplicaSet (命名空間: default):
+
+• my-web-app-7c8d9f5b6
+  Desired: 3
+  Current: 3
+  Ready: 3
+  Owner: Deployment/my-web-app
+  建立時間: 2024-01-01T09:00:00Z
+
+• api-service-5f6a7b8c9
+  Desired: 2
+  Current: 2
+  Ready: 2
+  Owner: Deployment/api-service
+  建立時間: 2024-01-01T09:15:00Z
+
+• background-worker-4d5e6f7a8
+  Desired: 1
+  Current: 1
+  Ready: 1
+  Owner: Deployment/background-worker
   建立時間: 2024-01-01T09:30:00Z
 ```
 
@@ -488,11 +535,12 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (6項)
+### 已完成 (7項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
 - [x] **Get Services** - 取得 Service 列表和詳細資訊
+- [x] **Get ReplicaSets** - 取得 ReplicaSet 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -503,8 +551,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (10項)
-- [ ] **Get ReplicaSets** - 取得 ReplicaSet 列表
+#### 資源查詢類 (9項)
 - [ ] **Get DaemonSets** - 取得 DaemonSet 列表
 - [ ] **Get StatefulSets** - 取得 StatefulSet 列表
 - [ ] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表
@@ -555,10 +602,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 6項核心功能
-- **待開發**: 39項功能
+- **已完成**: 7項核心功能
+- **待開發**: 38項功能
 - **總計**: 45項功能
-- **完成度**: 13.3%
+- **完成度**: 15.6%
 
 ## 授權
 
