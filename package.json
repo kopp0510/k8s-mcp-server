@@ -1,7 +1,7 @@
 {
   "name": "kubernetes-mcp-server",
-  "version": "2.1.1",
-  "description": "自開發的 Kubernetes MCP Server",
+  "version": "2.2.0",
+  "description": "自開發的 Kubernetes & Helm MCP Server",
   "type": "module",
   "main": "src/index.js",
   "bin": {
@@ -23,9 +23,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.13.0",
     "express": "^4.18.2",
+    "node-fetch": "^3.3.2",
     "zod": "^3.22.4"
   },
-  "devDependencies": {},
   "engines": {
     "node": ">=18.0.0"
   },
@@ -33,6 +33,7 @@
     "mcp",
     "kubernetes",
     "kubectl",
+    "helm",
     "server"
   ],
   "author": "danlio",

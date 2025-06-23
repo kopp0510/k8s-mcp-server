@@ -1,12 +1,13 @@
-# Kubernetes MCP Server
+# Kubernetes & Helm MCP Server
 
-一個簡單、可靠的 MCP (Model Context Protocol) Server，專為 Kubernetes 環境和 n8n 整合而設計。
+一個簡單、可靠的 MCP (Model Context Protocol) Server，專為 Kubernetes 和 Helm 環境管理，支援 n8n 整合。
 
 ## 特色
 
 - **n8n 原生支援** - 完美支援 n8n MCP Client 節點
 - **SSE 連接** - 使用 Server-Sent Events 提供即時雙向通訊
-- **Kubernetes 整合** - 提供 kubectl 工具存取
+- **Kubernetes 整合** - 提供完整的 kubectl 工具存取
+- **Helm 支援** - 提供 Helm chart 和 release 管理功能
 - **模組化架構** - 清晰的入口點和伺服器分離設計
 
 ## 檔案結構
@@ -28,11 +29,16 @@ k8s-mcp-server/
 │   │   ├── kubectl-top-containers.js # 容器資源使用情況監控
 │   │   ├── kubectl-scale-deployment.js # Deployment 擴縮工具
 │   │   ├── kubectl-restart-deployment.js # Deployment 重啟工具
-│   │   └── kubectl-edit-hpa.js    # HPA 編輯工具
+│   │   ├── kubectl-edit-hpa.js    # HPA 編輯工具
+│   │   ├── helm-list.js           # Helm release 列表工具
+│   │   ├── helm-status.js         # Helm release 狀態工具
+│   │   ├── helm-repo-list.js      # Helm repository 列表工具
+│   │   └── helm-get-values.js     # Helm release 配置值工具
 │   └── utils/                     # 工具函數
 │       ├── logger.js              # 日誌系統
 │       ├── validator.js           # 輸入驗證 (包含標籤驗證)
-│       └── kubectl.js             # kubectl 執行工具
+│       ├── kubectl.js             # kubectl 執行工具
+│       └── helm.js                # helm 執行工具
 ├── package.json                   # 專案配置和依賴
 ├── package-lock.json              # 依賴鎖定檔案
 ├── Dockerfile                     # Docker 容器建構檔案
@@ -324,6 +330,44 @@ SSE 模式 - 專為 n8n 設計
 **跨命名空間標籤篩選**：
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "pods", "allNamespaces": true, "labelSelector": "environment!=test"}`
+
+### Helm 工具使用範例
+
+**取得 Helm Release 列表**：
+- **Tool Name**: `helm_list`
+- **Parameters**: `{}`
+
+**取得特定命名空間的 Release**：
+- **Tool Name**: `helm_list`
+- **Parameters**: `{"namespace": "production"}`
+
+**查看 Release 狀態**：
+- **Tool Name**: `helm_status`
+- **Parameters**: `{"releaseName": "my-app", "namespace": "default"}`
+
+**查看 Release 配置值**：
+- **Tool Name**: `helm_get_values`
+- **Parameters**: `{"releaseName": "my-app", "namespace": "default"}`
+
+**查看所有值（包括預設值）**：
+- **Tool Name**: `helm_get_values`
+- **Parameters**: `{"releaseName": "my-app", "allValues": true}`
+
+**查看 Release 歷史記錄**：
+- **Tool Name**: `helm_history`
+- **Parameters**: `{"releaseName": "my-app", "namespace": "default"}`
+
+**查看指定數量的歷史記錄**：
+- **Tool Name**: `helm_history`
+- **Parameters**: `{"releaseName": "my-app", "max": 10, "output": "json"}`
+
+**列出 Helm Repositories**：
+- **Tool Name**: `helm_repo_list`
+- **Parameters**: `{}`
+
+**以 JSON 格式查看 Repositories**：
+- **Tool Name**: `helm_repo_list`
+- **Parameters**: `{"output": "json"}`
 
 ## 可用工具
 
@@ -2370,6 +2414,168 @@ Normal  Started    1m    kubelet            Started container my-app
 **提示**: 使用 `kubectl_logs` 查看 Pod 日誌，使用 `kubectl_get` 查看資源列表
 ```
 
+## Helm 工具
+
+### helm_list
+
+列出 Helm releases，支援多種篩選選項和輸出格式。等同於 `helm ls` 命令，支援 `-A` 參數。
+
+**參數**：
+- `namespace` (可選): Kubernetes 命名空間，預設查看 default 命名空間
+- `allNamespaces` (可選): 顯示所有命名空間的 releases，等同於 `helm ls -A`（預設：true）
+- `status` (可選): 按狀態篩選 releases，可選值：deployed, uninstalled, superseded, failed, pending-install, pending-upgrade, pending-rollback
+- `output` (可選): 輸出格式，可選值：table, json, yaml（預設：table）
+- `limit` (可選): 限制顯示的 releases 數量（1-100）
+- `sortBy` (可選): 排序方式，可選值：name, namespace, revision, updated, status, chart, app_version
+
+**範例**：
+```json
+// 查看所有命名空間的 releases（等同於 helm ls -A）
+{
+  "allNamespaces": true
+}
+
+// 查看特定狀態的 releases
+{
+  "allNamespaces": true,
+  "status": "deployed",
+  "sortBy": "updated"
+}
+
+// 查看特定命名空間的 releases
+{
+  "namespace": "production"
+}
+```
+
+### helm_status
+
+查看 Helm release 的詳細狀態資訊，包括部署資源和歷史。
+
+**參數**：
+- `releaseName` (必需): Helm release 名稱
+- `namespace` (可選): Kubernetes 命名空間
+- `revision` (可選): 指定修訂版本號（預設為最新版本）
+- `showResources` (可選): 顯示相關的 Kubernetes 資源（預設：false）
+- `showHooks` (可選): 顯示 Helm hooks（預設：false）
+
+**範例**：
+```json
+{
+  "releaseName": "my-app",
+  "namespace": "production",
+  "showResources": true
+}
+```
+
+### helm_get_values
+
+查看 Helm release 的配置值，支援多種輸出格式。
+
+**參數**：
+- `releaseName` (必需): Helm release 名稱
+- `namespace` (可選): Kubernetes 命名空間
+- `revision` (可選): 指定修訂版本號（預設為最新版本）
+- `output` (可選): 輸出格式：yaml, json, table（預設：yaml）
+- `allValues` (可選): 顯示所有值，包括預設值（預設：false）
+
+**範例**：
+```json
+{
+  "releaseName": "my-app",
+  "namespace": "default",
+  "allValues": true,
+  "output": "json"
+}
+```
+
+### helm_repo_list
+
+列出已添加的 Helm chart repositories。
+
+**參數**：
+- `output` (可選): 輸出格式：table, json, yaml（預設：table）
+
+**範例**：
+```json
+{
+  "output": "json"
+}
+```
+
+### helm_history
+
+查看 Helm release 的部署歷史記錄，包括所有版本的部署狀態和變更資訊。
+
+**參數**：
+- `releaseName` (必需): Helm release 名稱
+- `namespace` (可選): Kubernetes 命名空間
+- `max` (可選): 顯示的歷史記錄數量上限（預設：256）
+- `output` (可選): 輸出格式：table, json, yaml（預設：table）
+
+**範例 1 - 查看基本歷史記錄**：
+```json
+{
+  "releaseName": "my-app",
+  "namespace": "default"
+}
+```
+
+**範例 2 - 限制記錄數量**：
+```json
+{
+  "releaseName": "my-app",
+  "namespace": "production",
+  "max": 10
+}
+```
+
+**範例 3 - JSON 格式輸出**：
+```json
+{
+  "releaseName": "my-app",
+  "output": "json"
+}
+```
+
+**輸出範例**：
+```
+Helm Release 歷史記錄
+==================================================
+
+• Release 名稱：my-app
+• 命名空間：default
+
+找到 3 個歷史記錄：
+
+歷史記錄詳情：
+==================================================
+
+REVISION    UPDATED                     STATUS        CHART           APP VERSION    DESCRIPTION
+3           Mon Jan  1 12:00:00 2024    deployed      my-app-1.2.0    1.2.0          Upgrade complete
+2           Sun Dec 31 10:00:00 2023    superseded    my-app-1.1.0    1.1.0          Upgrade complete
+1           Sat Dec 30 09:00:00 2023    superseded    my-app-1.0.0    1.0.0          Install complete
+
+說明：
+• REVISION：版本號碼（數字越大表示越新）
+• UPDATED：部署或更新時間
+• STATUS：部署狀態（deployed=已部署，failed=失敗，superseded=被取代等）
+• CHART：使用的 Chart 版本
+• APP VERSION：應用程式版本
+• DESCRIPTION：部署描述或變更說明
+
+提示：
+• 使用 helm_status 查看當前 release 詳細資訊
+• 使用 helm_get_values 查看指定版本的配置值
+• 最新版本是 revision 3
+```
+
+**用途**：
+- 追蹤 release 的部署歷史和版本變化
+- 查看每次部署的狀態和時間
+- 分析部署失敗的歷史記錄
+- 準備回滾操作前的版本確認
+
 ## API 端點
 
 | 端點 | 方法 | 描述 |
@@ -2438,7 +2644,9 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (29項)
+### 已完成 (33項)
+
+#### Kubernetes 工具 (25項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -2469,6 +2677,15 @@ npm start
 - [x] **Restart Deployment** - 重啟 Deployment（滾動重啟）
 - [x] **Edit HPA** - 編輯 HorizontalPodAutoscaler 副本數量範圍
 - [x] **Filter by Labels** - 按標籤篩選 (支援 labelSelector 和 labels 參數)
+
+#### Helm 工具 (5項)
+- [x] **Helm List** - 列出 Helm releases，支援多種篩選選項（包含 -A 參數）
+- [x] **Helm Status** - 查看 Helm release 的詳細狀態資訊
+- [x] **Helm Get Values** - 查看 Helm release 的配置值
+- [x] **Helm Repo List** - 列出已添加的 Helm chart repositories
+- [x] **Helm History** - 查看 Helm release 的部署歷史記錄
+
+#### 系統架構 (4項)
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
@@ -2484,10 +2701,10 @@ npm start
 - [ ] **Delete Resource** - 刪除資源
 
 ### 功能統計
-- **已完成**: 29項核心功能
+- **已完成**: 34項核心功能 (Kubernetes: 25項 + Helm: 5項 + 系統: 4項)
 - **待開發**: 4項功能
-- **總計**: 33項功能
-- **完成度**: 87.9%
+- **總計**: 38項功能
+- **完成度**: 89.5%
 
 ## 授權
 

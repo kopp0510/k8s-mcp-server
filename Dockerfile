@@ -7,14 +7,22 @@ LABEL description="Kubernetes MCP Server with SSE support for n8n"
 LABEL version="1.0.0"
 LABEL project="k8s-mcp-server"
 
-# 安裝必要工具：kubectl 和 curl
-RUN apk add --no-cache curl && \
+# 安裝必要工具：kubectl、helm 和 curl
+RUN apk add --no-cache curl bash && \
+    # 安裝 kubectl
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/ && \
+    # 安裝 helm - 直接下載二進制檔案
+    HELM_VERSION=$(curl -s https://api.github.com/repos/helm/helm/releases/latest | grep tag_name | cut -d '"' -f 4) && \
+    curl -fsSL -o helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
+    tar -xzf helm.tar.gz && \
+    mv linux-amd64/helm /usr/local/bin/helm && \
+    rm -rf helm.tar.gz linux-amd64 && \
     # 驗證安裝
     kubectl version --client && \
-    apk del curl
+    helm version --client && \
+    apk del curl bash
 
 # 建立非 root 使用者
 RUN addgroup -g 1001 -S nodejs && \

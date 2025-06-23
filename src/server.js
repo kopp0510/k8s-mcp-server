@@ -22,6 +22,13 @@ import { KubectlScaleDeploymentTool } from './tools/kubectl-scale-deployment.js'
 import { KubectlRestartDeploymentTool } from './tools/kubectl-restart-deployment.js';
 import { KubectlEditHpaTool } from './tools/kubectl-edit-hpa.js';
 
+// 匯入 Helm 工具類別
+import { HelmListTool } from './tools/helm-list.js';
+import { HelmStatusTool } from './tools/helm-status.js';
+import { HelmRepoListTool } from './tools/helm-repo-list.js';
+import { HelmGetValuesTool } from './tools/helm-get-values.js';
+import { HelmHistoryTool } from './tools/helm-history.js';
+
 /**
  * 創建並配置 MCP Server
  */
@@ -44,6 +51,13 @@ function setupMCPServer() {
   const kubectlScaleDeploymentTool = new KubectlScaleDeploymentTool();
   const kubectlRestartDeploymentTool = new KubectlRestartDeploymentTool();
   const kubectlEditHpaTool = new KubectlEditHpaTool();
+
+  // 初始化 Helm 工具實例
+  const helmListTool = new HelmListTool();
+  const helmStatusTool = new HelmStatusTool();
+  const helmRepoListTool = new HelmRepoListTool();
+  const helmGetValuesTool = new HelmGetValuesTool();
+  const helmHistoryTool = new HelmHistoryTool();
 
   // 註冊工具到 MCP Server
   server.tool(
@@ -134,8 +148,50 @@ function setupMCPServer() {
     }
   );
 
+  // 註冊 Helm 工具到 MCP Server
+  server.tool(
+    helmListTool.name,
+    helmListTool.getDefinition().inputSchema,
+    async (args) => {
+      return await helmListTool.execute(args);
+    }
+  );
+
+  server.tool(
+    helmStatusTool.name,
+    helmStatusTool.getDefinition().inputSchema,
+    async (args) => {
+      return await helmStatusTool.execute(args);
+    }
+  );
+
+  server.tool(
+    helmRepoListTool.name,
+    helmRepoListTool.getDefinition().inputSchema,
+    async (args) => {
+      return await helmRepoListTool.execute(args);
+    }
+  );
+
+  server.tool(
+    helmGetValuesTool.name,
+    helmGetValuesTool.getDefinition().inputSchema,
+    async (args) => {
+      return await helmGetValuesTool.execute(args);
+    }
+  );
+
+  server.tool(
+    helmHistoryTool.name,
+    helmHistoryTool.getDefinition().inputSchema,
+    async (args) => {
+      return await helmHistoryTool.execute(args);
+    }
+  );
+
   // 創建可用工具列表
   const availableTools = [
+    // Kubectl 工具
     kubectlGetTool.getDefinition(),
     kubectlLogsTool.getDefinition(),
     kubectlDescribeTool.getDefinition(),
@@ -146,17 +202,51 @@ function setupMCPServer() {
     kubectlTopContainersTool.getDefinition(),
     kubectlScaleDeploymentTool.getDefinition(),
     kubectlRestartDeploymentTool.getDefinition(),
-    kubectlEditHpaTool.getDefinition()
+    kubectlEditHpaTool.getDefinition(),
+    // Helm 工具
+    helmListTool.getDefinition(),
+    helmStatusTool.getDefinition(),
+    helmRepoListTool.getDefinition(),
+    helmGetValuesTool.getDefinition(),
+    helmHistoryTool.getDefinition()
   ];
 
-  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool } };
+  return {
+    server,
+    availableTools,
+    tools: {
+      // Kubectl 工具
+      kubectlGetTool,
+      kubectlLogsTool,
+      kubectlDescribeTool,
+      kubectlClusterInfoTool,
+      kubectlGetYamlTool,
+      kubectlTopNodesTool,
+      kubectlTopPodsTool,
+      kubectlTopContainersTool,
+      kubectlScaleDeploymentTool,
+      kubectlRestartDeploymentTool,
+      kubectlEditHpaTool,
+      // Helm 工具
+      helmListTool,
+      helmStatusTool,
+      helmRepoListTool,
+      helmGetValuesTool,
+      helmHistoryTool
+    }
+  };
 }
 
 /**
  * 創建 MCP 訊息處理器
  */
 function createMCPHandler(tools, availableTools) {
-  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool } = tools;
+  const {
+    // Kubectl 工具
+    kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool,
+    // Helm 工具
+    helmListTool, helmStatusTool, helmRepoListTool, helmGetValuesTool, helmHistoryTool
+  } = tools;
 
   return async (message) => {
     try {
@@ -212,6 +302,22 @@ function createMCPHandler(tools, availableTools) {
             break;
           case 'kubectl_edit_hpa':
             result = await kubectlEditHpaTool.execute(toolArgs);
+            break;
+          // Helm 工具
+          case 'helm_list':
+            result = await helmListTool.execute(toolArgs);
+            break;
+          case 'helm_status':
+            result = await helmStatusTool.execute(toolArgs);
+            break;
+          case 'helm_repo_list':
+            result = await helmRepoListTool.execute(toolArgs);
+            break;
+          case 'helm_get_values':
+            result = await helmGetValuesTool.execute(toolArgs);
+            break;
+          case 'helm_history':
+            result = await helmHistoryTool.execute(toolArgs);
             break;
           default:
             throw new Error(`未知的工具: ${toolName}`);
