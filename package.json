@@ -12,6 +12,8 @@
     "start:http": "node src/index.js --http",
     "dev": "NODE_ENV=development LOG_LEVEL=debug node src/index.js",
     "test": "node test.js",
+    "test:labels": "node test-label-filter.js",
+    "test:all": "npm run test && npm run test:labels",
     "docker:build": "docker build -t k8s-mcp-server:latest .",
     "docker:run": "docker run -p 3000:3000 --name k8s-mcp-server k8s-mcp-server:latest",
     "docker:stop": "docker stop k8s-mcp-server && docker rm k8s-mcp-server",

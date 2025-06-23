@@ -119,6 +119,180 @@ class SimpleValidator {
       this.validateResourceName(namespace);
     }
   }
+
+  /**
+   * 驗證 Kubernetes 標籤鍵格式
+   * 標籤鍵可包含字母、數字、連字號、底線、點和斜線
+   */
+  validateLabelKey(key) {
+    if (!key || typeof key !== 'string') {
+      throw new Error('標籤鍵必須是非空字串');
+    }
+
+    if (key.length > 253) {
+      throw new Error(`標籤鍵 "${key}" 長度不能超過 253 字符`);
+    }
+
+    // 檢查是否包含前綴
+    let actualKey = key;
+    if (key.includes('/')) {
+      const parts = key.split('/');
+      if (parts.length !== 2) {
+        throw new Error(`標籤鍵 "${key}" 格式無效，最多只能包含一個斜線`);
+      }
+
+      const [prefix, name] = parts;
+
+      // 驗證前綴（域名格式）
+      if (prefix.length > 253) {
+        throw new Error(`標籤前綴 "${prefix}" 長度不能超過 253 字符`);
+      }
+
+      const prefixRegex = /^([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)*[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
+      if (!prefixRegex.test(prefix)) {
+        throw new Error(`標籤前綴 "${prefix}" 格式無效，必須是有效的 DNS 子域名`);
+      }
+
+      actualKey = name;
+    }
+
+    // 驗證實際鍵名稱部分
+    if (actualKey.length === 0) {
+      throw new Error('標籤鍵的名稱部分不能為空');
+    }
+
+    if (actualKey.length > 63) {
+      throw new Error(`標籤鍵的名稱部分 "${actualKey}" 長度不能超過 63 字符`);
+    }
+
+    const keyRegex = /^[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?$/;
+    if (!keyRegex.test(actualKey)) {
+      throw new Error(`標籤鍵 "${actualKey}" 格式無效。必須以字母或數字開始和結束，中間可包含字母、數字、連字號、底線、點`);
+    }
+  }
+
+  /**
+   * 驗證 Kubernetes 標籤值格式
+   */
+  validateLabelValue(value) {
+    if (typeof value !== 'string') {
+      throw new Error(`標籤值必須是字串，但收到 ${typeof value}`);
+    }
+
+    if (value.length > 63) {
+      throw new Error(`標籤值 "${value}" 長度不能超過 63 字符`);
+    }
+
+    // 空值是允許的
+    if (value.length === 0) {
+      return;
+    }
+
+    const valueRegex = /^[a-zA-Z0-9]([a-zA-Z0-9_.-]*[a-zA-Z0-9])?$/;
+    if (!valueRegex.test(value)) {
+      throw new Error(`標籤值 "${value}" 格式無效。必須以字母或數字開始和結束，中間可包含字母、數字、連字號、底線、點`);
+    }
+  }
+
+  /**
+   * 驗證標籤選擇器字串格式
+   * 支援格式：key=value, key!=value, key, !key, key in (value1,value2), key notin (value1,value2)
+   */
+  validateLabelSelector(selector) {
+    if (!selector || typeof selector !== 'string') {
+      throw new Error('標籤選擇器必須是非空字串');
+    }
+
+    if (selector.length > 1000) {
+      throw new Error('標籤選擇器長度不能超過 1000 字符');
+    }
+
+    // 移除空白字符進行驗證
+    const cleanSelector = selector.replace(/\s+/g, '');
+
+    // 分割選擇器表達式
+    const expressions = cleanSelector.split(',');
+
+    for (const expr of expressions) {
+      if (expr.trim().length === 0) {
+        throw new Error('標籤選擇器不能包含空的表達式');
+      }
+
+      this.validateSingleLabelExpression(expr.trim());
+    }
+  }
+
+  /**
+   * 驗證單個標籤表達式
+   */
+  validateSingleLabelExpression(expression) {
+    // 否定表達式 (!key)
+    if (expression.startsWith('!')) {
+      const key = expression.substring(1);
+      this.validateLabelKey(key);
+      return;
+    }
+
+    // in/notin 表達式
+    if (expression.includes(' in ') || expression.includes(' notin ')) {
+      const inMatch = expression.match(/^([^!]+)\s+(in|notin)\s*\(([^)]+)\)$/);
+      if (!inMatch) {
+        throw new Error(`標籤表達式 "${expression}" 格式無效`);
+      }
+
+      const [, key, operator, values] = inMatch;
+      this.validateLabelKey(key);
+
+      const valueList = values.split(',').map(v => v.trim());
+      for (const value of valueList) {
+        if (value.length === 0) {
+          throw new Error('in/notin 表達式中的值不能為空');
+        }
+        this.validateLabelValue(value);
+      }
+      return;
+    }
+
+    // 等於/不等於表達式 (key=value, key!=value)
+    if (expression.includes('=')) {
+      const equalMatch = expression.match(/^([^!=]+)(!=|=)(.*)$/);
+      if (!equalMatch) {
+        throw new Error(`標籤表達式 "${expression}" 格式無效`);
+      }
+
+      const [, key, operator, value] = equalMatch;
+      this.validateLabelKey(key);
+      this.validateLabelValue(value);
+      return;
+    }
+
+    // 存在性表達式 (key)
+    this.validateLabelKey(expression);
+  }
+
+  /**
+   * 驗證標籤物件
+   */
+  validateLabelsObject(labels) {
+    if (!labels || typeof labels !== 'object' || Array.isArray(labels)) {
+      throw new Error('標籤必須是有效的物件');
+    }
+
+    const labelCount = Object.keys(labels).length;
+    if (labelCount === 0) {
+      throw new Error('標籤物件不能為空');
+    }
+
+    if (labelCount > 50) {
+      throw new Error('標籤數量不能超過 50 個');
+    }
+
+    // 驗證每個標籤鍵值對
+    for (const [key, value] of Object.entries(labels)) {
+      this.validateLabelKey(key);
+      this.validateLabelValue(value);
+    }
+  }
 }
 
 export const validator = new SimpleValidator();

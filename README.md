@@ -187,6 +187,28 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_restart_deployment`
 - **Parameters**: `{"deploymentName": "my-web-app", "namespace": "default"}`
 
+**編輯 HPA 副本範圍**：
+- **Tool Name**: `kubectl_edit_hpa`
+- **Parameters**: `{"hpaName": "my-web-app-hpa", "minReplicas": 2, "maxReplicas": 10, "namespace": "default"}`
+
+**使用標籤篩選功能**：
+
+**根據標籤篩選 Pod**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "pods", "namespace": "default", "labelSelector": "app=nginx"}`
+
+**多條件標籤篩選**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "deployments", "namespace": "production", "labelSelector": "app=web,tier=frontend,environment=prod"}`
+
+**使用標籤物件篩選**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "services", "labels": {"app": "nginx", "version": "1.0"}}`
+
+**跨命名空間標籤篩選**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "pods", "allNamespaces": true, "labelSelector": "environment!=test"}`
+
 ## 可用工具
 
 ### kubectl_get
@@ -194,9 +216,14 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress" 或 "hpa"
-- `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes 和 pv 以外的所有資源（cluster-scoped 資源），預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress", "hpa", "namespaces", "events"
+- `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes, pv 和 namespaces 以外的所有資源（cluster-scoped 資源），預設為 "default"
+- `allNamespaces` (可選): 查看所有命名空間的資源 (等同於 kubectl -A 參數，不適用於 cluster-scoped 資源)
 - `name` (可選): 特定資源名稱
+- `labelSelector` (可選): 標籤選擇器，使用 Kubernetes 原生語法 (例如: "app=nginx,environment!=test")
+- `labels` (可選): 標籤物件，使用 JSON 格式 (例如: {"app": "nginx", "tier": "frontend"})
+
+**注意**: `labelSelector` 和 `labels` 參數不能同時使用，請選擇其中一種方式。
 
 **範例 1 - 取得所有 Pod**：
 ```json
@@ -471,18 +498,101 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 34 - 取得叢集基本資訊**：
+**標籤篩選範例**
+
+**範例 34 - 使用標籤選擇器篩選 Pod**：
 ```json
 {
+  "resource": "pods",
+  "namespace": "default",
+  "labelSelector": "app=nginx"
 }
 ```
 
-**範例 35 - 取得叢集詳細轉儲資訊**：
+**範例 35 - 使用多個標籤條件篩選**：
 ```json
 {
-  "dump": true
+  "resource": "deployments",
+  "namespace": "production",
+  "labelSelector": "app=web,tier=frontend,environment=prod"
 }
 ```
+
+**範例 36 - 使用否定條件篩選**：
+```json
+{
+  "resource": "pods",
+  "allNamespaces": true,
+  "labelSelector": "app=nginx,environment!=test"
+}
+```
+
+**範例 37 - 檢查標籤存在性**：
+```json
+{
+  "resource": "services",
+  "namespace": "monitoring",
+  "labelSelector": "hasMetrics,!debug"
+}
+```
+
+**範例 38 - 使用標籤物件篩選**：
+```json
+{
+  "resource": "pods",
+  "namespace": "default",
+  "labels": {
+    "app": "nginx",
+    "version": "1.0"
+  }
+}
+```
+
+**範例 39 - 使用前綴標籤篩選**：
+```json
+{
+  "resource": "deployments",
+  "allNamespaces": true,
+  "labels": {
+    "kubernetes.io/name": "my-app",
+    "app.kubernetes.io/version": "v1.2.3"
+  }
+}
+```
+
+**範例 40 - 混合使用標籤和其他參數**：
+```json
+{
+  "resource": "configmaps",
+  "namespace": "default",
+  "labelSelector": "type=config,managed-by=helm"
+}
+```
+
+**詳細說明**
+
+標籤篩選功能支援以下語法：
+
+**標籤選擇器 (labelSelector) 語法**：
+- 等值匹配：`app=nginx`
+- 不等值匹配：`environment!=test`
+- 存在性檢查：`hasBackup`
+- 否定存在性：`!debug`
+- 多條件組合：`app=nginx,tier=frontend,environment=prod`
+
+**標籤物件 (labels) 格式**：
+- 簡單鍵值對：`{"app": "nginx"}`
+- 多標籤：`{"app": "nginx", "version": "1.0", "tier": "frontend"}`
+- 前綴標籤：`{"kubernetes.io/name": "my-app"}`
+- 存在性檢查（空值）：`{"app": "nginx", "hasBackup": ""}`
+
+**重要限制**：
+- `labelSelector` 和 `labels` 不能同時使用
+- 標籤鍵最長 253 字符（含前綴）
+- 標籤值最長 63 字符
+- 必須符合 Kubernetes 標籤命名規範
+
+詳細的標籤選擇器語法請參考 [Kubernetes 官方文檔](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#label-selectors)。
 
 **Pod 輸出範例**：
 ```
@@ -2012,7 +2122,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (25項)
+### 已完成 (26項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -2039,6 +2149,7 @@ npm start
 - [x] **Scale Deployment** - 擴縮 Deployment 副本數量
 - [x] **Restart Deployment** - 重啟 Deployment（滾動重啟）
 - [x] **Edit HPA** - 編輯 HorizontalPodAutoscaler 副本數量範圍
+- [x] **Filter by Labels** - 按標籤篩選 (支援 labelSelector 和 labels 參數)
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
@@ -2047,40 +2158,25 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 監控類 (2項)
-- [ ] **Get Node Metrics** - 取得 Node 指標
-- [ ] **Get Pod Metrics** - 取得 Pod 指標
-
-#### 操作類 (5項)
-- [ ] **Delete Pod** - 刪除 Pod
+#### 操作類 (4項)
 - [ ] **Apply YAML** - 應用 YAML 配置
 - [ ] **Create Resource** - 創建資源
 - [ ] **Update Resource** - 更新資源
 - [ ] **Delete Resource** - 刪除資源
 
-#### 互動類 (4項)
-- [ ] **Exec into Pod** - 進入 Pod 執行指令
-- [ ] **Port Forward** - 端口轉發
-- [ ] **Copy Files** - 複製檔案到/從 Pod
-- [ ] **Attach to Pod** - 附加到 Pod
-
-#### 管理類 (3項)
-- [ ] **Filter by Labels** - 按標籤篩選
+#### 管理類 (1項)
 - [ ] **Filter by Annotations** - 按註解篩選
-- [ ] **Get Resource Status** - 取得資源狀態
 
-#### 進階功能 (5項)
-- [ ] **Stream Pod Logs** - 即時串流 Pod 日誌
+#### 進階功能 (3項)
 - [ ] **Get ServiceAccounts** - 取得服務帳戶
-- [ ] **Get Roles/RoleBindings** - 取得角色和角色綁定
 - [ ] **Get ClusterRoles** - 取得叢集角色
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 26項核心功能
-- **待開發**: 19項功能
-- **總計**: 45項功能
-- **完成度**: 57.8%
+- **已完成**: 27項核心功能
+- **待開發**: 8項功能
+- **總計**: 35項功能
+- **完成度**: 77.1%
 
 ## 授權
 
