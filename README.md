@@ -123,6 +123,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "deployments", "namespace": "default"}`
 
+**取得 Service 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "services", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -138,8 +142,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes" 或 "deployments"
-- `namespace` (可選): Kubernetes 命名空間，適用於 pods 和 deployments，預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments" 或 "services"
+- `namespace` (可選): Kubernetes 命名空間，適用於 pods, deployments 和 services，預設為 "default"
 - `name` (可選): 特定資源名稱
 
 **範例 1 - 取得所有 Pod**：
@@ -180,6 +184,23 @@ SSE 模式 - 專為 n8n 設計
   "resource": "deployments",
   "namespace": "production",
   "name": "my-app"
+}
+```
+
+**範例 6 - 取得所有 Service**：
+```json
+{
+  "resource": "services",
+  "namespace": "default"
+}
+```
+
+**範例 7 - 取得特定 Service**：
+```json
+{
+  "resource": "services",
+  "namespace": "kube-system",
+  "name": "kube-dns"
 }
 ```
 
@@ -243,6 +264,30 @@ SSE 模式 - 專為 n8n 設計
   Ready: 1/1
   Up-to-date: 1
   Available: 1
+  建立時間: 2024-01-01T09:30:00Z
+```
+
+**Service 輸出範例**：
+```
+找到 4 個 Service (命名空間: default):
+
+• my-web-app-service
+  類型: ClusterIP
+  Cluster IP: 10.96.123.45
+  端口: 80/TCP -> 8080/TCP
+  建立時間: 2024-01-01T09:00:00Z
+
+• api-service-lb
+  類型: LoadBalancer
+  Cluster IP: 10.96.123.46
+  External IP: 203.0.113.10
+  端口: 443/TCP -> 8443/TCP
+  建立時間: 2024-01-01T09:15:00Z
+
+• database-service
+  類型: ClusterIP
+  Cluster IP: 10.96.123.47
+  端口: 5432/TCP -> 5432/TCP
   建立時間: 2024-01-01T09:30:00Z
 ```
 
@@ -443,10 +488,11 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (5項)
+### 已完成 (6項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
+- [x] **Get Services** - 取得 Service 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -457,8 +503,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (11項)
-- [ ] **Get Services** - 取得 Service 列表
+#### 資源查詢類 (10項)
 - [ ] **Get ReplicaSets** - 取得 ReplicaSet 列表
 - [ ] **Get DaemonSets** - 取得 DaemonSet 列表
 - [ ] **Get StatefulSets** - 取得 StatefulSet 列表
@@ -510,10 +555,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 5項核心功能
-- **待開發**: 40項功能
+- **已完成**: 6項核心功能
+- **待開發**: 39項功能
 - **總計**: 45項功能
-- **完成度**: 11.1%
+- **完成度**: 13.3%
 
 ## 授權
 
