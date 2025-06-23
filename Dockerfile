@@ -48,4 +48,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
 EXPOSE 3000
 
 # 啟動指令 (SSE 模式)
-CMD ["node", "src/server.js", "--http", "--port", "3000"]
+CMD ["node", "src/index.js", "--http", "--port", "3000"]

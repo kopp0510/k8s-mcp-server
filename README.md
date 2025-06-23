@@ -9,6 +9,39 @@
 - **Kubernetes 整合** - 提供 kubectl 工具存取
 - **健壯設計** - 從最基礎開始，逐步擴展功能
 - **中文友好** - 完整的中文介面和文檔
+- **模組化架構** - 清晰的入口點和伺服器分離設計
+
+## 檔案結構
+
+```
+src/
+├── index.js              # 主程式入口，處理生命週期和參數解析
+├── server.js             # MCP + Express 整合，伺服器實現
+├── tools/                # 工具模組
+│   ├── base-tool.js      # 基底工具類別
+│   ├── kubectl-get.js    # 資源查詢工具
+│   ├── kubectl-logs.js   # 日誌查看工具
+│   └── kubectl-describe.js # 資源描述工具
+└── utils/                # 工具函數
+    ├── logger.js         # 日誌系統
+    ├── validator.js      # 輸入驗證
+    └── kubectl.js        # kubectl 執行工具
+```
+
+### 架構說明
+
+- **`src/index.js`** - 程式主入口，負責：
+  - 命令列參數解析
+  - 環境變數設定
+  - 生命週期管理
+  - 優雅關閉處理
+  - 錯誤處理
+
+- **`src/server.js`** - 伺服器實現，負責：
+  - MCP Server 設定和工具註冊
+  - Express 應用程式建立 (SSE 模式)
+  - MCP 訊息處理
+  - SSE 連接管理
 
 ## 快速開始
 
