@@ -119,6 +119,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "nodes"}`
 
+**取得 Deployment 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "deployments", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -134,8 +138,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods" 或 "nodes"
-- `namespace` (可選): Kubernetes 命名空間，僅對 pods 有效，預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes" 或 "deployments"
+- `namespace` (可選): Kubernetes 命名空間，適用於 pods 和 deployments，預設為 "default"
 - `name` (可選): 特定資源名稱
 
 **範例 1 - 取得所有 Pod**：
@@ -159,6 +163,23 @@ SSE 模式 - 專為 n8n 設計
   "resource": "pods",
   "namespace": "default",
   "name": "my-pod-123"
+}
+```
+
+**範例 4 - 取得所有 Deployment**：
+```json
+{
+  "resource": "deployments",
+  "namespace": "default"
+}
+```
+
+**範例 5 - 取得特定 Deployment**：
+```json
+{
+  "resource": "deployments",
+  "namespace": "production",
+  "name": "my-app"
 }
 ```
 
@@ -200,6 +221,29 @@ SSE 模式 - 專為 n8n 設計
   作業系統: linux/amd64
   容器運行時: containerd://1.7.0
   建立時間: 2024-01-01T08:15:00Z
+```
+
+**Deployment 輸出範例**：
+```
+找到 5 個 Deployment (命名空間: default):
+
+• my-web-app
+  Ready: 3/3
+  Up-to-date: 3
+  Available: 3
+  建立時間: 2024-01-01T09:00:00Z
+
+• api-service
+  Ready: 2/2
+  Up-to-date: 2
+  Available: 2
+  建立時間: 2024-01-01T09:15:00Z
+
+• background-worker
+  Ready: 1/1
+  Up-to-date: 1
+  Available: 1
+  建立時間: 2024-01-01T09:30:00Z
 ```
 
 ### kubectl_logs
@@ -399,9 +443,10 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (4項)
+### 已完成 (5項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
+- [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -412,8 +457,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (12項)
-- [ ] **Get Deployments** - 取得 Deployment 列表
+#### 資源查詢類 (11項)
 - [ ] **Get Services** - 取得 Service 列表
 - [ ] **Get ReplicaSets** - 取得 ReplicaSet 列表
 - [ ] **Get DaemonSets** - 取得 DaemonSet 列表
@@ -466,10 +510,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 4項核心功能
-- **待開發**: 41項功能
+- **已完成**: 5項核心功能
+- **待開發**: 40項功能
 - **總計**: 45項功能
-- **完成度**: 8.9%
+- **完成度**: 11.1%
 
 ## 授權
 

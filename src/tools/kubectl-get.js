@@ -3,7 +3,7 @@ import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlGetTool extends BaseTool {
   constructor() {
-    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes)');
+    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments)');
   }
 
   getDefinition() {
@@ -16,11 +16,11 @@ export class KubectlGetTool extends BaseTool {
           resource: {
             type: 'string',
             description: '資源類型',
-            enum: ['pods', 'nodes'],
+            enum: ['pods', 'nodes', 'deployments'],
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (僅適用於 pods)',
+            description: '命名空間 (適用於 pods 和 deployments)',
           },
           name: {
             type: 'string',
@@ -39,8 +39,8 @@ export class KubectlGetTool extends BaseTool {
       const { resource, namespace, name } = args;
 
       // 驗證資源類型
-      if (!['pods', 'nodes'].includes(resource)) {
-        throw new Error(`不支援的資源類型: ${resource}，僅支援 pods 和 nodes`);
+      if (!['pods', 'nodes', 'deployments'].includes(resource)) {
+        throw new Error(`不支援的資源類型: ${resource}，僅支援 pods, nodes 和 deployments`);
       }
 
       // nodes 不支援 namespace
@@ -51,7 +51,8 @@ export class KubectlGetTool extends BaseTool {
       // 建構 kubectl 指令
       const kubectlArgs = ['get', resource];
 
-      if (namespace && resource === 'pods') {
+      // pods 和 deployments 支援 namespace
+      if (namespace && (resource === 'pods' || resource === 'deployments')) {
         kubectlArgs.push('-n', namespace);
       }
 
