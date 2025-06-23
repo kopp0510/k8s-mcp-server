@@ -3,7 +3,7 @@ import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlGetTool extends BaseTool {
   constructor() {
-    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets)');
+    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa)');
   }
 
   getDefinition() {
@@ -16,11 +16,11 @@ export class KubectlGetTool extends BaseTool {
           resource: {
             type: 'string',
             description: '資源類型',
-            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets'],
+            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa'],
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (適用於 pods, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps 和 secrets)',
+            description: '命名空間 (適用於除了 nodes 和 pv 以外的所有資源)',
           },
           name: {
             type: 'string',
@@ -39,21 +39,22 @@ export class KubectlGetTool extends BaseTool {
       const { resource, namespace, name } = args;
 
       // 驗證資源類型
-      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets'];
+      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa'];
       if (!supportedResources.includes(resource)) {
         throw new Error(`不支援的資源類型: ${resource}，僅支援 ${supportedResources.join(', ')}`);
       }
 
-      // nodes 不支援 namespace
-      if (resource === 'nodes' && namespace) {
-        throw new Error('nodes 資源不支援 namespace 參數');
+      // nodes 和 pv 不支援 namespace (cluster-scoped resources)
+      const clusterScopedResources = ['nodes', 'pv'];
+      if (clusterScopedResources.includes(resource) && namespace) {
+        throw new Error(`${resource} 資源不支援 namespace 參數（cluster-scoped 資源）`);
       }
 
       // 建構 kubectl 指令
       const kubectlArgs = ['get', resource];
 
-      // 除了 nodes 以外的所有資源都支援 namespace
-      if (namespace && resource !== 'nodes') {
+      // 除了 cluster-scoped 資源以外的所有資源都支援 namespace
+      if (namespace && !clusterScopedResources.includes(resource)) {
         kubectlArgs.push('-n', namespace);
       }
 

@@ -155,6 +155,22 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "secrets", "namespace": "default"}`
 
+**取得 PersistentVolume 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "pv"}`
+
+**取得 PersistentVolumeClaim 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "pvc", "namespace": "default"}`
+
+**取得 Ingress 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "ingress", "namespace": "default"}`
+
+**取得 HorizontalPodAutoscaler 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "hpa", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -170,8 +186,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps" 或 "secrets"
-- `namespace` (可選): Kubernetes 命名空間，適用於所有資源類型（除了 nodes），預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress" 或 "hpa"
+- `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes 和 pv 以外的所有資源（cluster-scoped 資源），預設為 "default"
 - `name` (可選): 特定資源名稱
 
 **範例 1 - 取得所有 Pod**：
@@ -330,6 +346,72 @@ SSE 模式 - 專為 n8n 設計
   "resource": "secrets",
   "namespace": "kube-system",
   "name": "default-token"
+}
+```
+
+**範例 20 - 取得所有 PersistentVolume**：
+```json
+{
+  "resource": "pv"
+}
+```
+
+**範例 21 - 取得特定 PersistentVolume**：
+```json
+{
+  "resource": "pv",
+  "name": "pv-storage-001"
+}
+```
+
+**範例 22 - 取得所有 PersistentVolumeClaim**：
+```json
+{
+  "resource": "pvc",
+  "namespace": "default"
+}
+```
+
+**範例 23 - 取得特定 PersistentVolumeClaim**：
+```json
+{
+  "resource": "pvc",
+  "namespace": "production",
+  "name": "mysql-pvc"
+}
+```
+
+**範例 24 - 取得所有 Ingress**：
+```json
+{
+  "resource": "ingress",
+  "namespace": "default"
+}
+```
+
+**範例 25 - 取得特定 Ingress**：
+```json
+{
+  "resource": "ingress",
+  "namespace": "production",
+  "name": "web-ingress"
+}
+```
+
+**範例 26 - 取得所有 HorizontalPodAutoscaler**：
+```json
+{
+  "resource": "hpa",
+  "namespace": "default"
+}
+```
+
+**範例 27 - 取得特定 HPA**：
+```json
+{
+  "resource": "hpa",
+  "namespace": "production",
+  "name": "web-hpa"
 }
 ```
 
@@ -581,6 +663,99 @@ SSE 模式 - 專為 n8n 設計
   建立時間: 2024-01-01T08:30:00Z
 ```
 
+**PersistentVolume 輸出範例**：
+```
+找到 3 個 PersistentVolume:
+
+• pv-storage-001
+  Capacity: 10Gi
+  Access Modes: ReadWriteOnce
+  Reclaim Policy: Retain
+  Status: Available
+  Storage Class: fast-ssd
+  建立時間: 2024-01-01T07:00:00Z
+
+• pv-storage-002
+  Capacity: 50Gi
+  Access Modes: ReadWriteMany
+  Reclaim Policy: Delete
+  Status: Bound
+  Claim: default/mysql-pvc
+  Storage Class: standard
+  建立時間: 2024-01-01T07:15:00Z
+
+• pv-storage-003
+  Capacity: 100Gi
+  Access Modes: ReadWriteOnce
+  Reclaim Policy: Retain
+  Status: Available
+  Storage Class: slow-hdd
+  建立時間: 2024-01-01T07:30:00Z
+```
+
+**PersistentVolumeClaim 輸出範例**：
+```
+找到 2 個 PersistentVolumeClaim (命名空間: default):
+
+• mysql-pvc
+  Status: Bound
+  Volume: pv-storage-002
+  Capacity: 50Gi
+  Access Modes: ReadWriteMany
+  Storage Class: standard
+  建立時間: 2024-01-01T08:00:00Z
+
+• redis-pvc
+  Status: Pending
+  Volume:
+  Capacity: 20Gi
+  Access Modes: ReadWriteOnce
+  Storage Class: fast-ssd
+  建立時間: 2024-01-01T08:15:00Z
+```
+
+**Ingress 輸出範例**：
+```
+找到 2 個 Ingress (命名空間: default):
+
+• web-ingress
+  Class: nginx
+  Hosts:
+  - api.example.com -> my-api-service:80
+  - web.example.com -> my-web-service:80
+  Address: 203.0.113.10
+  建立時間: 2024-01-01T09:00:00Z
+
+• admin-ingress
+  Class: traefik
+  Hosts:
+  - admin.example.com -> admin-service:8080
+  Address: 203.0.113.11
+  建立時間: 2024-01-01T09:15:00Z
+```
+
+**HorizontalPodAutoscaler 輸出範例**：
+```
+找到 2 個 HorizontalPodAutoscaler (命名空間: default):
+
+• web-hpa
+  Scale Target: Deployment/my-web-app
+  Min Replicas: 2
+  Max Replicas: 10
+  Current Replicas: 3
+  CPU: 45% / 70%
+  Memory: 60% / 80%
+  建立時間: 2024-01-01T10:00:00Z
+
+• api-hpa
+  Scale Target: Deployment/my-api-service
+  Min Replicas: 1
+  Max Replicas: 5
+  Current Replicas: 2
+  CPU: 30% / 50%
+  建立時間: 2024-01-01T10:15:00Z
+```
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -778,7 +953,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (12項)
+### 已完成 (16項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -789,6 +964,10 @@ npm start
 - [x] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表和詳細資訊
 - [x] **Get ConfigMaps** - 取得 ConfigMap 列表和詳細資訊
 - [x] **Get Secrets** - 取得 Secret 列表和詳細資訊
+- [x] **Get PersistentVolumes** - 取得 PV 列表和詳細資訊
+- [x] **Get PersistentVolumeClaims** - 取得 PVC 列表和詳細資訊
+- [x] **Get Ingress** - 取得 Ingress 列表和詳細資訊
+- [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -798,12 +977,6 @@ npm start
 - [x] 智慧錯誤處理和格式化輸出
 
 ### 未完成功能 (依分類整理)
-
-#### 資源查詢類 (4項)
-- [ ] **Get PersistentVolumes** - 取得 PV 列表
-- [ ] **Get PersistentVolumeClaims** - 取得 PVC 列表
-- [ ] **Get Ingress** - 取得 Ingress 列表
-- [ ] **Get HPA** - 取得 HorizontalPodAutoscaler 列表
 
 #### 監控類 (6項)
 - [ ] **Top Nodes** - 查看 Node 資源使用情況
@@ -845,10 +1018,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 12項核心功能
-- **待開發**: 33項功能
+- **已完成**: 16項核心功能
+- **待開發**: 29項功能
 - **總計**: 45項功能
-- **完成度**: 26.7%
+- **完成度**: 35.6%
 
 ## 授權
 
