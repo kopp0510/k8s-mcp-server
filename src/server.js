@@ -13,6 +13,7 @@ import { logger } from './utils/logger.js';
 import { KubectlGetTool } from './tools/kubectl-get.js';
 import { KubectlLogsTool } from './tools/kubectl-logs.js';
 import { KubectlDescribeTool } from './tools/kubectl-describe.js';
+import { KubectlClusterInfoTool } from './tools/kubectl-cluster-info.js';
 
 /**
  * 創建並配置 MCP Server
@@ -28,6 +29,7 @@ function setupMCPServer() {
   const kubectlGetTool = new KubectlGetTool();
   const kubectlLogsTool = new KubectlLogsTool();
   const kubectlDescribeTool = new KubectlDescribeTool();
+  const kubectlClusterInfoTool = new KubectlClusterInfoTool();
 
   // 註冊工具到 MCP Server
   server.tool(
@@ -54,21 +56,30 @@ function setupMCPServer() {
     }
   );
 
+  server.tool(
+    kubectlClusterInfoTool.name,
+    kubectlClusterInfoTool.getDefinition().inputSchema,
+    async (args) => {
+      return await kubectlClusterInfoTool.execute(args);
+    }
+  );
+
   // 創建可用工具列表
   const availableTools = [
     kubectlGetTool.getDefinition(),
     kubectlLogsTool.getDefinition(),
-    kubectlDescribeTool.getDefinition()
+    kubectlDescribeTool.getDefinition(),
+    kubectlClusterInfoTool.getDefinition()
   ];
 
-  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool } };
+  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool } };
 }
 
 /**
  * 創建 MCP 訊息處理器
  */
 function createMCPHandler(tools, availableTools) {
-  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool } = tools;
+  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool } = tools;
 
   return async (message) => {
     try {
@@ -100,6 +111,9 @@ function createMCPHandler(tools, availableTools) {
             break;
           case 'kubectl_describe':
             result = await kubectlDescribeTool.execute(toolArgs);
+            break;
+          case 'kubectl_cluster_info':
+            result = await kubectlClusterInfoTool.execute(toolArgs);
             break;
           default:
             throw new Error(`未知的工具: ${toolName}`);

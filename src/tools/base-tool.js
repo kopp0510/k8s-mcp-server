@@ -18,7 +18,8 @@ export class BaseTool {
 
   // 通用驗證
   validateInput(args) {
-    validator.validateInput(args);
+    const definition = this.getDefinition();
+    validator.validateInput(args, definition.inputSchema);
   }
 
   // 統一回應格式

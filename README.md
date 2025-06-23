@@ -463,6 +463,19 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
+**範例 34 - 取得叢集基本資訊**：
+```json
+{
+}
+```
+
+**範例 35 - 取得叢集詳細轉儲資訊**：
+```json
+{
+  "dump": true
+}
+```
+
 **Pod 輸出範例**：
 ```
 找到 12 個 Pod (命名空間: kube-system):
@@ -961,6 +974,63 @@ SSE 模式 - 專為 n8n 設計
   次數: 1
 ```
 
+**Cluster Info 輸出範例**：
+```
+叢集資訊
+==================================================
+
+**控制平面**
+   端點: https://kubernetes.docker.internal:6443
+
+**CoreDNS**
+   端點: https://kubernetes.docker.internal:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+**除錯提示**
+   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+**詳細資訊**
+   使用 dump: true 參數取得完整的叢集狀態轉儲
+```
+
+### kubectl_cluster_info
+
+取得 Kubernetes 叢集資訊，包含控制平面和服務端點。
+
+**參數**：
+- `dump` (可選): 布林值，是否取得詳細的叢集狀態轉儲資訊，預設為 false
+
+**範例 1 - 取得基本叢集資訊**：
+```json
+{}
+```
+
+**範例 2 - 取得詳細叢集轉儲**：
+```json
+{
+  "dump": true
+}
+```
+
+**基本資訊輸出範例**：
+```
+叢集資訊
+==================================================
+
+**控制平面**
+   端點: https://kubernetes.docker.internal:6443
+
+**CoreDNS**
+   端點: https://kubernetes.docker.internal:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+
+**除錯提示**
+   To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+**詳細資訊**
+   使用 dump: true 參數取得完整的叢集狀態轉儲
+```
+
+**提示**: 使用 dump: true 可取得完整的叢集診斷資訊，包含所有節點狀態、Pod 資訊、事件等
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1158,7 +1228,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (18項)
+### 已完成 (19項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1175,6 +1245,7 @@ npm start
 - [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
 - [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
 - [x] **Get Events** - 取得 Event 列表和詳細資訊
+- [x] **Get Cluster Info** - 取得叢集資訊和服務端點
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -1214,19 +1285,18 @@ npm start
 - [ ] **Get Resource YAML** - 取得資源 YAML
 - [ ] **Get Resource Status** - 取得資源狀態
 
-#### 進階功能 (6項)
+#### 進階功能 (5項)
 - [ ] **Stream Pod Logs** - 即時串流 Pod 日誌
-- [ ] **Get Cluster Info** - 取得叢集資訊
 - [ ] **Get ServiceAccounts** - 取得服務帳戶
 - [ ] **Get Roles/RoleBindings** - 取得角色和角色綁定
 - [ ] **Get ClusterRoles** - 取得叢集角色
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 18項核心功能
-- **待開發**: 27項功能
+- **已完成**: 19項核心功能
+- **待開發**: 26項功能
 - **總計**: 45項功能
-- **完成度**: 40.0%
+- **完成度**: 42.2%
 
 ## 授權
 

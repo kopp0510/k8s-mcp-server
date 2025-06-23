@@ -19,10 +19,35 @@ class SimpleLogger {
       timestamp,
       level: level.toUpperCase(),
       message,
-      ...meta
+      ...this.serializeMeta(meta)
     };
 
     return JSON.stringify(logObj);
+  }
+
+  serializeMeta(meta) {
+    if (meta instanceof Error) {
+      return {
+        error: meta.message,
+        stack: meta.stack,
+        name: meta.name
+      };
+    }
+
+    const serialized = {};
+    for (const [key, value] of Object.entries(meta)) {
+      if (value instanceof Error) {
+        serialized[key] = {
+          message: value.message,
+          stack: value.stack,
+          name: value.name
+        };
+      } else {
+        serialized[key] = value;
+      }
+    }
+
+    return serialized;
   }
 
   debug(message, meta) {
