@@ -415,6 +415,29 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
+**範例 28 - 取得所有 Namespace**：
+```json
+{
+  "resource": "namespaces"
+}
+```
+
+**範例 29 - 使用 -A 參數查看所有命名空間的 Pod**：
+```json
+{
+  "resource": "pods",
+  "allNamespaces": true
+}
+```
+
+**範例 30 - 使用 -A 參數查看所有命名空間的 Deployment**：
+```json
+{
+  "resource": "deployments",
+  "allNamespaces": true
+}
+```
+
 **Pod 輸出範例**：
 ```
 找到 12 個 Pod (命名空間: kube-system):
@@ -756,6 +779,78 @@ SSE 模式 - 專為 n8n 設計
   建立時間: 2024-01-01T10:15:00Z
 ```
 
+**Namespace 輸出範例**：
+```
+找到 6 個 Namespace:
+
+• default
+  狀態: Active
+  建立時間: 2024-01-01T00:00:00Z
+
+• kube-system
+  狀態: Active
+  建立時間: 2024-01-01T00:00:00Z
+
+• kube-public
+  狀態: Active
+  建立時間: 2024-01-01T00:00:00Z
+
+• production
+  狀態: Active
+  建立時間: 2024-01-01T08:00:00Z
+
+• staging
+  狀態: Active
+  建立時間: 2024-01-01T08:15:00Z
+
+• monitoring
+  狀態: Active
+  建立時間: 2024-01-01T08:30:00Z
+```
+
+**使用 -A 參數的輸出範例**：
+```
+找到 25 個 Pod (所有命名空間):
+
+命名空間: default
+• my-web-app-7c8d9f5b6-abc123
+  狀態: Running
+  Ready: 1/1
+  重啟次數: 0
+  建立時間: 2024-01-01T09:00:00Z
+  節點: k8s-node-1
+
+• api-service-5f6a7b8c9-def456
+  狀態: Running
+  Ready: 1/1
+  重啟次數: 0
+  建立時間: 2024-01-01T09:15:00Z
+  節點: k8s-node-2
+
+命名空間: kube-system
+• coredns-76f75df574-ghi789
+  狀態: Running
+  Ready: 1/1
+  重啟次數: 0
+  建立時間: 2024-01-01T08:00:00Z
+  節點: k8s-master-1
+
+• kube-proxy-jkl012
+  狀態: Running
+  Ready: 1/1
+  重啟次數: 0
+  建立時間: 2024-01-01T08:00:00Z
+  節點: k8s-node-1
+
+命名空間: production
+• web-prod-app-mno345
+  狀態: Running
+  Ready: 1/1
+  重啟次數: 0
+  建立時間: 2024-01-01T10:00:00Z
+  節點: k8s-node-3
+```
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -953,7 +1048,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (16項)
+### 已完成 (17項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -968,6 +1063,7 @@ npm start
 - [x] **Get PersistentVolumeClaims** - 取得 PVC 列表和詳細資訊
 - [x] **Get Ingress** - 取得 Ingress 列表和詳細資訊
 - [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
+- [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -1002,8 +1098,7 @@ npm start
 - [ ] **Copy Files** - 複製檔案到/從 Pod
 - [ ] **Attach to Pod** - 附加到 Pod
 
-#### 管理類 (5項)
-- [ ] **List Namespaces** - 列出命名空間
+#### 管理類 (4項)
 - [ ] **Filter by Labels** - 按標籤篩選
 - [ ] **Filter by Annotations** - 按註解篩選
 - [ ] **Get Resource YAML** - 取得資源 YAML
@@ -1018,10 +1113,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 16項核心功能
-- **待開發**: 29項功能
+- **已完成**: 17項核心功能
+- **待開發**: 28項功能
 - **總計**: 45項功能
-- **完成度**: 35.6%
+- **完成度**: 37.8%
 
 ## 授權
 

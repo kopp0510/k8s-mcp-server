@@ -3,7 +3,7 @@ import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlGetTool extends BaseTool {
   constructor() {
-    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa)');
+    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces)');
   }
 
   getDefinition() {
@@ -16,11 +16,16 @@ export class KubectlGetTool extends BaseTool {
           resource: {
             type: 'string',
             description: '資源類型',
-            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa'],
+            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces'],
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (適用於除了 nodes 和 pv 以外的所有資源)',
+            description: '命名空間 (適用於除了 nodes, pv 和 namespaces 以外的所有資源)',
+          },
+          allNamespaces: {
+            type: 'boolean',
+            description: '查看所有命名空間的資源 (等同於 kubectl -A 參數，不適用於 cluster-scoped 資源)',
+            default: false,
           },
           name: {
             type: 'string',
@@ -36,25 +41,37 @@ export class KubectlGetTool extends BaseTool {
     try {
       this.validateInput(args);
 
-      const { resource, namespace, name } = args;
+      const { resource, namespace, allNamespaces, name } = args;
 
       // 驗證資源類型
-      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa'];
+      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces'];
       if (!supportedResources.includes(resource)) {
         throw new Error(`不支援的資源類型: ${resource}，僅支援 ${supportedResources.join(', ')}`);
       }
 
-      // nodes 和 pv 不支援 namespace (cluster-scoped resources)
-      const clusterScopedResources = ['nodes', 'pv'];
-      if (clusterScopedResources.includes(resource) && namespace) {
-        throw new Error(`${resource} 資源不支援 namespace 參數（cluster-scoped 資源）`);
+      // cluster-scoped 資源不支援 namespace 和 allNamespaces
+      const clusterScopedResources = ['nodes', 'pv', 'namespaces'];
+      if (clusterScopedResources.includes(resource)) {
+        if (namespace) {
+          throw new Error(`${resource} 資源不支援 namespace 參數（cluster-scoped 資源）`);
+        }
+        if (allNamespaces) {
+          throw new Error(`${resource} 資源不支援 allNamespaces 參數（cluster-scoped 資源）`);
+        }
+      }
+
+      // namespace 和 allNamespaces 不能同時使用
+      if (namespace && allNamespaces) {
+        throw new Error('namespace 和 allNamespaces 參數不能同時使用');
       }
 
       // 建構 kubectl 指令
       const kubectlArgs = ['get', resource];
 
-      // 除了 cluster-scoped 資源以外的所有資源都支援 namespace
-      if (namespace && !clusterScopedResources.includes(resource)) {
+      // 處理命名空間參數
+      if (allNamespaces && !clusterScopedResources.includes(resource)) {
+        kubectlArgs.push('-A');
+      } else if (namespace && !clusterScopedResources.includes(resource)) {
         kubectlArgs.push('-n', namespace);
       }
 

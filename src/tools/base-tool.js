@@ -38,7 +38,15 @@ export class BaseTool {
   }
 
   createErrorResponse(message) {
-    return this.createResponse(`錯誤: ${message}`);
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: `錯誤: ${message}`,
+        },
+      ],
+    };
   }
 
   // 日誌
