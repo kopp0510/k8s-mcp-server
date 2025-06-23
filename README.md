@@ -7,25 +7,39 @@
 - **n8n 原生支援** - 完美支援 n8n MCP Client 節點
 - **SSE 連接** - 使用 Server-Sent Events 提供即時雙向通訊
 - **Kubernetes 整合** - 提供 kubectl 工具存取
-- **健壯設計** - 從最基礎開始，逐步擴展功能
-- **中文友好** - 完整的中文介面和文檔
 - **模組化架構** - 清晰的入口點和伺服器分離設計
 
 ## 檔案結構
 
 ```
-src/
-├── index.js              # 主程式入口，處理生命週期和參數解析
-├── server.js             # MCP + Express 整合，伺服器實現
-├── tools/                # 工具模組
-│   ├── base-tool.js      # 基底工具類別
-│   ├── kubectl-get.js    # 資源查詢工具
-│   ├── kubectl-logs.js   # 日誌查看工具
-│   └── kubectl-describe.js # 資源描述工具
-└── utils/                # 工具函數
-    ├── logger.js         # 日誌系統
-    ├── validator.js      # 輸入驗證
-    └── kubectl.js        # kubectl 執行工具
+k8s-mcp-server/
+├── src/                           # 原始碼目錄
+│   ├── index.js                   # 主程式入口，處理生命週期和參數解析
+│   ├── server.js                  # MCP + Express 整合，伺服器實現
+│   ├── tools/                     # 工具模組
+│   │   ├── base-tool.js           # 基底工具類別
+│   │   ├── kubectl-get.js         # 資源查詢工具 (支援標籤篩選)
+│   │   ├── kubectl-logs.js        # Pod 日誌查看工具
+│   │   ├── kubectl-describe.js    # 資源詳細描述工具
+│   │   ├── kubectl-cluster-info.js # 叢集資訊查詢工具
+│   │   ├── kubectl-get-yaml.js    # 資源 YAML 格式輸出工具
+│   │   ├── kubectl-top-nodes.js   # Node 資源使用情況監控
+│   │   ├── kubectl-top-pods.js    # Pod 資源使用情況監控
+│   │   ├── kubectl-top-containers.js # 容器資源使用情況監控
+│   │   ├── kubectl-scale-deployment.js # Deployment 擴縮工具
+│   │   ├── kubectl-restart-deployment.js # Deployment 重啟工具
+│   │   └── kubectl-edit-hpa.js    # HPA 編輯工具
+│   └── utils/                     # 工具函數
+│       ├── logger.js              # 日誌系統
+│       ├── validator.js           # 輸入驗證 (包含標籤驗證)
+│       └── kubectl.js             # kubectl 執行工具
+├── package.json                   # 專案配置和依賴
+├── package-lock.json              # 依賴鎖定檔案
+├── Dockerfile                     # Docker 容器建構檔案
+├── build.sh                       # Docker 建構腳本
+├── .gitignore                     # Git 忽略檔案配置
+├── .cursorignore                  # Cursor 編輯器忽略檔案配置
+└── README.md                      # 專案說明文檔
 ```
 
 ### 架構說明
