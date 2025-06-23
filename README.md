@@ -131,6 +131,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "replicasets", "namespace": "default"}`
 
+**取得 DaemonSet 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "daemonsets", "namespace": "kube-system"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -146,8 +150,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services" 或 "replicasets"
-- `namespace` (可選): Kubernetes 命名空間，適用於 pods, deployments, services 和 replicasets，預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets" 或 "daemonsets"
+- `namespace` (可選): Kubernetes 命名空間，適用於 pods, deployments, services, replicasets 和 daemonsets，預設為 "default"
 - `name` (可選): 特定資源名稱
 
 **範例 1 - 取得所有 Pod**：
@@ -222,6 +226,23 @@ SSE 模式 - 專為 n8n 設計
   "resource": "replicasets",
   "namespace": "production",
   "name": "my-app-7c8d9f5b6"
+}
+```
+
+**範例 10 - 取得所有 DaemonSet**：
+```json
+{
+  "resource": "daemonsets",
+  "namespace": "kube-system"
+}
+```
+
+**範例 11 - 取得特定 DaemonSet**：
+```json
+{
+  "resource": "daemonsets",
+  "namespace": "kube-system",
+  "name": "fluentd-elasticsearch"
 }
 ```
 
@@ -336,6 +357,27 @@ SSE 模式 - 專為 n8n 設計
   Ready: 1
   Owner: Deployment/background-worker
   建立時間: 2024-01-01T09:30:00Z
+```
+
+**DaemonSet 輸出範例**：
+```
+找到 2 個 DaemonSet (命名空間: kube-system):
+
+• fluentd-elasticsearch
+  Desired: 3
+  Current: 3
+  Ready: 3
+  Up-to-date: 3
+  Available: 3
+  建立時間: 2024-01-01T08:00:00Z
+
+• node-exporter
+  Desired: 3
+  Current: 3
+  Ready: 3
+  Up-to-date: 3
+  Available: 3
+  建立時間: 2024-01-01T08:15:00Z
 ```
 
 ### kubectl_logs
@@ -535,12 +577,13 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (7項)
+### 已完成 (8項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
 - [x] **Get Services** - 取得 Service 列表和詳細資訊
 - [x] **Get ReplicaSets** - 取得 ReplicaSet 列表和詳細資訊
+- [x] **Get DaemonSets** - 取得 DaemonSet 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -551,8 +594,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (9項)
-- [ ] **Get DaemonSets** - 取得 DaemonSet 列表
+#### 資源查詢類 (8項)
 - [ ] **Get StatefulSets** - 取得 StatefulSet 列表
 - [ ] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表
 - [ ] **Get ConfigMaps** - 取得 ConfigMap 列表
@@ -602,10 +644,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 7項核心功能
-- **待開發**: 38項功能
+- **已完成**: 8項核心功能
+- **待開發**: 37項功能
 - **總計**: 45項功能
-- **完成度**: 15.6%
+- **完成度**: 17.8%
 
 ## 授權
 

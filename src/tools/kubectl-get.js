@@ -3,7 +3,7 @@ import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlGetTool extends BaseTool {
   constructor() {
-    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets)');
+    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets)');
   }
 
   getDefinition() {
@@ -16,11 +16,11 @@ export class KubectlGetTool extends BaseTool {
           resource: {
             type: 'string',
             description: '資源類型',
-            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets'],
+            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets'],
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (適用於 pods, deployments, services 和 replicasets)',
+            description: '命名空間 (適用於 pods, deployments, services, replicasets 和 daemonsets)',
           },
           name: {
             type: 'string',
@@ -39,8 +39,8 @@ export class KubectlGetTool extends BaseTool {
       const { resource, namespace, name } = args;
 
       // 驗證資源類型
-      if (!['pods', 'nodes', 'deployments', 'services', 'replicasets'].includes(resource)) {
-        throw new Error(`不支援的資源類型: ${resource}，僅支援 pods, nodes, deployments, services 和 replicasets`);
+      if (!['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets'].includes(resource)) {
+        throw new Error(`不支援的資源類型: ${resource}，僅支援 pods, nodes, deployments, services, replicasets 和 daemonsets`);
       }
 
       // nodes 不支援 namespace
@@ -51,8 +51,8 @@ export class KubectlGetTool extends BaseTool {
       // 建構 kubectl 指令
       const kubectlArgs = ['get', resource];
 
-      // pods, deployments, services 和 replicasets 支援 namespace
-      if (namespace && (resource === 'pods' || resource === 'deployments' || resource === 'services' || resource === 'replicasets')) {
+      // pods, deployments, services, replicasets 和 daemonsets 支援 namespace
+      if (namespace && (resource === 'pods' || resource === 'deployments' || resource === 'services' || resource === 'replicasets' || resource === 'daemonsets')) {
         kubectlArgs.push('-n', namespace);
       }
 
