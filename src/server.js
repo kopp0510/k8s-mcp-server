@@ -20,6 +20,7 @@ import { KubectlTopPodsTool } from './tools/kubectl-top-pods.js';
 import { KubectlTopContainersTool } from './tools/kubectl-top-containers.js';
 import { KubectlScaleDeploymentTool } from './tools/kubectl-scale-deployment.js';
 import { KubectlRestartDeploymentTool } from './tools/kubectl-restart-deployment.js';
+import { KubectlEditHpaTool } from './tools/kubectl-edit-hpa.js';
 
 /**
  * 創建並配置 MCP Server
@@ -42,6 +43,7 @@ function setupMCPServer() {
   const kubectlTopContainersTool = new KubectlTopContainersTool();
   const kubectlScaleDeploymentTool = new KubectlScaleDeploymentTool();
   const kubectlRestartDeploymentTool = new KubectlRestartDeploymentTool();
+  const kubectlEditHpaTool = new KubectlEditHpaTool();
 
   // 註冊工具到 MCP Server
   server.tool(
@@ -124,6 +126,14 @@ function setupMCPServer() {
     }
   );
 
+  server.tool(
+    kubectlEditHpaTool.name,
+    kubectlEditHpaTool.getDefinition().inputSchema,
+    async (args) => {
+      return await kubectlEditHpaTool.execute(args);
+    }
+  );
+
   // 創建可用工具列表
   const availableTools = [
     kubectlGetTool.getDefinition(),
@@ -135,17 +145,18 @@ function setupMCPServer() {
     kubectlTopPodsTool.getDefinition(),
     kubectlTopContainersTool.getDefinition(),
     kubectlScaleDeploymentTool.getDefinition(),
-    kubectlRestartDeploymentTool.getDefinition()
+    kubectlRestartDeploymentTool.getDefinition(),
+    kubectlEditHpaTool.getDefinition()
   ];
 
-  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool } };
+  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool } };
 }
 
 /**
  * 創建 MCP 訊息處理器
  */
 function createMCPHandler(tools, availableTools) {
-  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool } = tools;
+  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool } = tools;
 
   return async (message) => {
     try {
@@ -198,6 +209,9 @@ function createMCPHandler(tools, availableTools) {
             break;
           case 'kubectl_restart_deployment':
             result = await kubectlRestartDeploymentTool.execute(toolArgs);
+            break;
+          case 'kubectl_edit_hpa':
+            result = await kubectlEditHpaTool.execute(toolArgs);
             break;
           default:
             throw new Error(`未知的工具: ${toolName}`);

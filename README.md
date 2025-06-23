@@ -1666,6 +1666,155 @@ Deployment 重啟操作結果
 - 使用 `kubectl_logs` 查看新 Pod 的啟動日誌
 - 對於關鍵服務，建議設定較長的 timeout 值
 
+### kubectl_edit_hpa
+
+編輯 Kubernetes HorizontalPodAutoscaler (HPA) 的副本數量範圍，僅允許修改 minReplicas 和 maxReplicas 以確保安全性。
+
+**參數**：
+- `hpaName` (必需): HorizontalPodAutoscaler 名稱
+- `minReplicas` (可選): 最小副本數量（1-100）
+- `maxReplicas` (可選): 最大副本數量（1-1000）
+- `namespace` (可選): Kubernetes 命名空間，預設為 "default"
+- `wait` (可選): 是否等待 HPA 狀態更新，預設為 false
+- `timeout` (可選): 等待超時時間（秒，30-600），預設為 120
+
+**範例 63 - 調整 HPA 範圍**：
+```json
+{
+  "hpaName": "my-web-app-hpa",
+  "minReplicas": 2,
+  "maxReplicas": 10,
+  "namespace": "default"
+}
+```
+
+**範例 64 - 僅調整最大副本數**：
+```json
+{
+  "hpaName": "my-api-hpa",
+  "maxReplicas": 20,
+  "namespace": "production"
+}
+```
+
+**範例 65 - 調整範圍並等待更新完成**：
+```json
+{
+  "hpaName": "my-backend-hpa",
+  "minReplicas": 3,
+  "maxReplicas": 15,
+  "namespace": "production",
+  "wait": true,
+  "timeout": 180
+}
+```
+
+**成功輸出範例**：
+```
+HorizontalPodAutoscaler 編輯操作結果
+==================================================
+
+操作摘要：
+• HPA: my-web-app-hpa
+• 命名空間: default
+• 擴縮目標: Deployment/my-web-app
+• 操作類型: 副本數量範圍調整
+
+變更詳情：
+• 最小副本數: 1 → 2 (+1)
+• 最大副本數: 5 → 10 (+5)
+
+狀態對比：
+┌────────────────────┬──────────┬──────────┐
+│ 項目               │ 編輯前   │ 編輯後   │
+├────────────────────┼──────────┼──────────┤
+│ 最小副本數         │ 1        │ 2        │
+│ 最大副本數         │ 5        │ 10       │
+│ 當前副本數         │ 1        │ 2        │
+│ 期望副本數         │ 1        │ 2        │
+│ Generation         │ 1        │ 2        │
+│ Observed Generation│ 1        │ 2        │
+└────────────────────┴──────────┴──────────┘
+
+操作結果：
+[成功] HPA 規格已成功更新到目標值
+[成功] Controller 已觀察到最新規格
+[提示] 當前副本數 (2) 低於新的最小值，HPA 可能會觸發擴容
+
+提示：
+• 此操作未等待完成，HPA 可能仍在更新中
+• 使用 kubectl_get 檢查 HPA 狀態：{"resource": "hpa", "namespace": "default", "name": "my-web-app-hpa"}
+• 使用 kubectl_get 檢查目標 Deployment：{"resource": "deployments", "namespace": "default"}
+• 使用 kubectl_describe 查看詳細資訊：{"resource": "hpa", "name": "my-web-app-hpa", "namespace": "default"}
+• HPA 將根據 CPU 使用率在 2-10 範圍內自動調整副本數
+```
+
+**等待完成的輸出範例**：
+```
+HorizontalPodAutoscaler 編輯操作結果
+==================================================
+
+操作摘要：
+• HPA: my-api-hpa
+• 命名空間: production
+• 擴縮目標: Deployment/my-api
+• 操作類型: 副本數量範圍調整
+
+變更詳情：
+• 最小副本數: 2 → 3 (+1)
+• 最大副本數: 10 → 20 (+10)
+
+狀態對比：
+┌────────────────────┬──────────┬──────────┐
+│ 項目               │ 編輯前   │ 編輯後   │
+├────────────────────┼──────────┼──────────┤
+│ 最小副本數         │ 2        │ 3        │
+│ 最大副本數         │ 10       │ 20       │
+│ 當前副本數         │ 5        │ 5        │
+│ 期望副本數         │ 5        │ 5        │
+│ Generation         │ 3        │ 4        │
+│ Observed Generation│ 3        │ 4        │
+└────────────────────┴──────────┴──────────┘
+
+操作結果：
+[成功] HPA 規格已成功更新到目標值
+[成功] Controller 已觀察到最新規格
+[正常] 當前副本數在新的範圍內，HPA 將根據指標動態調整
+
+等待資訊：
+• 已等待 HPA 規格更新完成
+
+• 使用 kubectl_get 檢查 HPA 狀態：{"resource": "hpa", "namespace": "production", "name": "my-api-hpa"}
+• 使用 kubectl_get 檢查目標 Deployment：{"resource": "deployments", "namespace": "production"}
+• 使用 kubectl_describe 查看詳細資訊：{"resource": "hpa", "name": "my-api-hpa", "namespace": "production"}
+• HPA 將根據 CPU 使用率在 3-20 範圍內自動調整副本數
+```
+
+**參數邏輯驗證**：
+- 自動檢查 minReplicas 不能大於 maxReplicas
+- 檢查 HPA 是否存在並取得當前狀態
+- 驗證新的範圍設定是否合理
+- 檢查是否有實際需要變更的參數
+
+**擴縮影響分析**：
+- 當前副本數低於新最小值：HPA 可能觸發擴容
+- 當前副本數超過新最大值：HPA 可能觸發縮容
+- 當前副本數在新範圍內：HPA 根據指標動態調整
+
+**安全特性**：
+- 僅允許修改 minReplicas 和 maxReplicas
+- 不允許修改 CPU 閾值或其他敏感配置
+- 自動驗證 HPA 存在性和參數合理性
+- 支援等待機制確保更新完成
+- 詳細的操作前後狀態對比和影響分析
+
+**提示**:
+- 此工具專注於安全的 HPA 副本範圍調整
+- 設定 `wait: true` 可確保更新操作完全完成
+- 調整範圍後，HPA 會根據當前負載自動調整到合適的副本數
+- 建議根據應用的實際負載模式設定合理的範圍
+- 使用 `kubectl_get` 監控 HPA 和目標 Deployment 的狀態變化
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1889,6 +2038,7 @@ npm start
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] **Scale Deployment** - 擴縮 Deployment 副本數量
 - [x] **Restart Deployment** - 重啟 Deployment（滾動重啟）
+- [x] **Edit HPA** - 編輯 HorizontalPodAutoscaler 副本數量範圍
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
@@ -1901,8 +2051,7 @@ npm start
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
 
-#### 操作類 (6項)
-- [ ] **Edit HPA** - 編輯 HorizontalPodAutoscaler
+#### 操作類 (5項)
 - [ ] **Delete Pod** - 刪除 Pod
 - [ ] **Apply YAML** - 應用 YAML 配置
 - [ ] **Create Resource** - 創建資源
@@ -1928,10 +2077,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 25項核心功能
-- **待開發**: 20項功能
+- **已完成**: 26項核心功能
+- **待開發**: 19項功能
 - **總計**: 45項功能
-- **完成度**: 55.6%
+- **完成度**: 57.8%
 
 ## 授權
 
