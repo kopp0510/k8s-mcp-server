@@ -147,6 +147,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "cronjobs", "namespace": "default"}`
 
+**取得 ConfigMap 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "configmaps", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -162,7 +166,7 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs" 或 "cronjobs"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs" 或 "configmaps"
 - `namespace` (可選): Kubernetes 命名空間，適用於所有資源類型（除了 nodes），預設為 "default"
 - `name` (可選): 特定資源名稱
 
@@ -288,6 +292,23 @@ SSE 模式 - 專為 n8n 設計
 {
   "resource": "cronjobs",
   "namespace": "default"
+}
+```
+
+**範例 16 - 取得所有 ConfigMap**：
+```json
+{
+  "resource": "configmaps",
+  "namespace": "default"
+}
+```
+
+**範例 17 - 取得特定 ConfigMap**：
+```json
+{
+  "resource": "configmaps",
+  "namespace": "kube-system",
+  "name": "kube-proxy"
 }
 ```
 
@@ -487,6 +508,33 @@ SSE 模式 - 專為 n8n 設計
   建立時間: 2024-01-01T00:00:00Z
 ```
 
+**ConfigMap 輸出範例**：
+```
+找到 4 個 ConfigMap (命名空間: default):
+
+• app-config
+  Data: 3 項
+  - database.host: mysql.default.svc.cluster.local
+  - database.port: 3306
+  - app.debug: false
+  建立時間: 2024-01-01T09:00:00Z
+
+• nginx-config
+  Data: 2 項
+  - nginx.conf: [1.2KB]
+  - default.conf: [0.8KB]
+  建立時間: 2024-01-01T09:15:00Z
+
+• env-config
+  Data: 5 項
+  - NODE_ENV: production
+  - LOG_LEVEL: info
+  - PORT: 3000
+  - REDIS_URL: redis://redis:6379
+  - API_VERSION: v1
+  建立時間: 2024-01-01T09:30:00Z
+```
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -684,7 +732,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (10項)
+### 已完成 (11項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -693,6 +741,7 @@ npm start
 - [x] **Get DaemonSets** - 取得 DaemonSet 列表和詳細資訊
 - [x] **Get StatefulSets** - 取得 StatefulSet 列表和詳細資訊
 - [x] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表和詳細資訊
+- [x] **Get ConfigMaps** - 取得 ConfigMap 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -703,8 +752,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (6項)
-- [ ] **Get ConfigMaps** - 取得 ConfigMap 列表
+#### 資源查詢類 (5項)
 - [ ] **Get Secrets** - 取得 Secret 列表
 - [ ] **Get PersistentVolumes** - 取得 PV 列表
 - [ ] **Get PersistentVolumeClaims** - 取得 PVC 列表
@@ -751,10 +799,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 10項核心功能
-- **待開發**: 35項功能
+- **已完成**: 11項核心功能
+- **待開發**: 34項功能
 - **總計**: 45項功能
-- **完成度**: 22.2%
+- **完成度**: 24.4%
 
 ## 授權
 
