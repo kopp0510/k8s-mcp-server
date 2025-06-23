@@ -438,6 +438,31 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
+**範例 31 - 取得預設命名空間的 Event**：
+```json
+{
+  "resource": "events",
+  "namespace": "default"
+}
+```
+
+**範例 32 - 取得所有命名空間的 Event**：
+```json
+{
+  "resource": "events",
+  "allNamespaces": true
+}
+```
+
+**範例 33 - 取得特定 Event**：
+```json
+{
+  "resource": "events",
+  "namespace": "kube-system",
+  "name": "my-pod.17a1b2c3d4e5f678"
+}
+```
+
 **Pod 輸出範例**：
 ```
 找到 12 個 Pod (命名空間: kube-system):
@@ -851,6 +876,91 @@ SSE 模式 - 專為 n8n 設計
   節點: k8s-node-3
 ```
 
+**Event 輸出範例**：
+```
+找到 8 個 Event (命名空間: default):
+
+• my-web-app-7c8d9f5b6-abc123.17a1b2c3d4e5f678
+  類型: Normal
+  原因: Scheduled
+  物件: Pod/my-web-app-7c8d9f5b6-abc123
+  訊息: Successfully assigned default/my-web-app-7c8d9f5b6-abc123 to k8s-node-1
+  來源: default-scheduler
+  首次發生: 2024-01-01T12:00:00Z
+  最後發生: 2024-01-01T12:00:00Z
+  次數: 1
+
+• my-web-app-7c8d9f5b6-abc123.17a1b2c3d4e5f679
+  類型: Normal
+  原因: Pulling
+  物件: Pod/my-web-app-7c8d9f5b6-abc123
+  訊息: Pulling image "nginx:1.21"
+  來源: kubelet
+  首次發生: 2024-01-01T12:00:01Z
+  最後發生: 2024-01-01T12:00:01Z
+  次數: 1
+
+• my-web-app-7c8d9f5b6-abc123.17a1b2c3d4e5f680
+  類型: Normal
+  原因: Pulled
+  物件: Pod/my-web-app-7c8d9f5b6-abc123
+  訊息: Successfully pulled image "nginx:1.21" in 2.5s
+  來源: kubelet
+  首次發生: 2024-01-01T12:00:03Z
+  最後發生: 2024-01-01T12:00:03Z
+  次數: 1
+
+• my-web-app-7c8d9f5b6-abc123.17a1b2c3d4e5f681
+  類型: Normal
+  原因: Created
+  物件: Pod/my-web-app-7c8d9f5b6-abc123
+  訊息: Created container nginx
+  來源: kubelet
+  首次發生: 2024-01-01T12:00:04Z
+  最後發生: 2024-01-01T12:00:04Z
+  次數: 1
+
+• my-web-app-7c8d9f5b6-abc123.17a1b2c3d4e5f682
+  類型: Normal
+  原因: Started
+  物件: Pod/my-web-app-7c8d9f5b6-abc123
+  訊息: Started container nginx
+  來源: kubelet
+  首次發生: 2024-01-01T12:00:05Z
+  最後發生: 2024-01-01T12:00:05Z
+  次數: 1
+
+• api-service-deployment.17a1b2c3d4e5f683
+  類型: Normal
+  原因: ScalingReplicaSet
+  物件: Deployment/api-service-deployment
+  訊息: Scaled up replica set api-service-5f6a7b8c9 to 3
+  來源: deployment-controller
+  首次發生: 2024-01-01T12:05:00Z
+  最後發生: 2024-01-01T12:05:00Z
+  次數: 1
+
+• database-pvc.17a1b2c3d4e5f684
+  類型: Warning
+  原因: FailedMount
+  物件: PersistentVolumeClaim/database-pvc
+  訊息: Unable to attach or mount volumes: unmounted volumes=[data], unattached volumes=[data]: timed out waiting for the condition
+  來源: kubelet
+  首次發生: 2024-01-01T12:10:00Z
+  最後發生: 2024-01-01T12:15:00Z
+  次數: 5
+
+• node-monitor-daemonset.17a1b2c3d4e5f685
+  類型: Normal
+  原因: SuccessfulCreate
+  物件: DaemonSet/node-monitor-daemonset
+  訊息: Created pod: node-monitor-daemonset-xyz789
+  來源: daemonset-controller
+  首次發生: 2024-01-01T12:20:00Z
+  最後發生: 2024-01-01T12:20:00Z
+  次數: 1
+```
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1048,7 +1158,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (17項)
+### 已完成 (18項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1064,6 +1174,7 @@ npm start
 - [x] **Get Ingress** - 取得 Ingress 列表和詳細資訊
 - [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
 - [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
+- [x] **Get Events** - 取得 Event 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -1074,13 +1185,12 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 監控類 (6項)
+#### 監控類 (5項)
 - [ ] **Top Nodes** - 查看 Node 資源使用情況
 - [ ] **Top Pods** - 查看 Pod 資源使用情況
 - [ ] **Top Containers** - 查看容器資源使用情況
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
-- [ ] **Get Events** - 取得叢集事件
 
 #### 操作類 (8項)
 - [ ] **Edit HPA** - 編輯 HorizontalPodAutoscaler
@@ -1113,10 +1223,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 17項核心功能
-- **待開發**: 28項功能
+- **已完成**: 18項核心功能
+- **待開發**: 27項功能
 - **總計**: 45項功能
-- **完成度**: 37.8%
+- **完成度**: 40.0%
 
 ## 授權
 
