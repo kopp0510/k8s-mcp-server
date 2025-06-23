@@ -14,6 +14,9 @@ import { KubectlGetTool } from './tools/kubectl-get.js';
 import { KubectlLogsTool } from './tools/kubectl-logs.js';
 import { KubectlDescribeTool } from './tools/kubectl-describe.js';
 import { KubectlClusterInfoTool } from './tools/kubectl-cluster-info.js';
+import { KubectlGetYamlTool } from './tools/kubectl-get-yaml.js';
+import { KubectlTopNodesTool } from './tools/kubectl-top-nodes.js';
+import { KubectlTopPodsTool } from './tools/kubectl-top-pods.js';
 
 /**
  * 創建並配置 MCP Server
@@ -30,6 +33,9 @@ function setupMCPServer() {
   const kubectlLogsTool = new KubectlLogsTool();
   const kubectlDescribeTool = new KubectlDescribeTool();
   const kubectlClusterInfoTool = new KubectlClusterInfoTool();
+  const kubectlGetYamlTool = new KubectlGetYamlTool();
+  const kubectlTopNodesTool = new KubectlTopNodesTool();
+  const kubectlTopPodsTool = new KubectlTopPodsTool();
 
   // 註冊工具到 MCP Server
   server.tool(
@@ -64,22 +70,49 @@ function setupMCPServer() {
     }
   );
 
+  server.tool(
+    kubectlGetYamlTool.name,
+    kubectlGetYamlTool.getDefinition().inputSchema,
+    async (args) => {
+      return await kubectlGetYamlTool.execute(args);
+    }
+  );
+
+  server.tool(
+    kubectlTopNodesTool.name,
+    kubectlTopNodesTool.getDefinition().inputSchema,
+    async (args) => {
+      return await kubectlTopNodesTool.execute(args);
+    }
+  );
+
+  server.tool(
+    kubectlTopPodsTool.name,
+    kubectlTopPodsTool.getDefinition().inputSchema,
+    async (args) => {
+      return await kubectlTopPodsTool.execute(args);
+    }
+  );
+
   // 創建可用工具列表
   const availableTools = [
     kubectlGetTool.getDefinition(),
     kubectlLogsTool.getDefinition(),
     kubectlDescribeTool.getDefinition(),
-    kubectlClusterInfoTool.getDefinition()
+    kubectlClusterInfoTool.getDefinition(),
+    kubectlGetYamlTool.getDefinition(),
+    kubectlTopNodesTool.getDefinition(),
+    kubectlTopPodsTool.getDefinition()
   ];
 
-  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool } };
+  return { server, availableTools, tools: { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool } };
 }
 
 /**
  * 創建 MCP 訊息處理器
  */
 function createMCPHandler(tools, availableTools) {
-  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool } = tools;
+  const { kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool } = tools;
 
   return async (message) => {
     try {
@@ -114,6 +147,15 @@ function createMCPHandler(tools, availableTools) {
             break;
           case 'kubectl_cluster_info':
             result = await kubectlClusterInfoTool.execute(toolArgs);
+            break;
+          case 'kubectl_get_yaml':
+            result = await kubectlGetYamlTool.execute(toolArgs);
+            break;
+          case 'kubectl_top_nodes':
+            result = await kubectlTopNodesTool.execute(toolArgs);
+            break;
+          case 'kubectl_top_pods':
+            result = await kubectlTopPodsTool.execute(toolArgs);
             break;
           default:
             throw new Error(`未知的工具: ${toolName}`);

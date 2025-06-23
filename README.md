@@ -1031,6 +1031,302 @@ SSE 模式 - 專為 n8n 設計
 
 **提示**: 使用 dump: true 可取得完整的叢集診斷資訊，包含所有節點狀態、Pod 資訊、事件等
 
+### kubectl_get_yaml
+
+取得 Kubernetes 資源的 YAML 格式輸出，用於檢查配置、備份或調試。
+
+**參數**：
+- `resource` (必需): 資源類型，支援 pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events
+- `name` (可選): 資源名稱，如果不提供則取得所有資源
+- `namespace` (可選): 命名空間，僅適用於 namespace-scoped 資源
+- `allNamespaces` (可選): 布林值，是否查看所有命名空間的資源
+
+**範例 36 - 取得所有 Pod 的 YAML**：
+```json
+{
+  "resource": "pods"
+}
+```
+
+**範例 37 - 取得指定 Pod 的 YAML**：
+```json
+{
+  "resource": "pods",
+  "name": "my-app-abc123",
+  "namespace": "default"
+}
+```
+
+**範例 38 - 取得指定命名空間所有 Deployment 的 YAML**：
+```json
+{
+  "resource": "deployments",
+  "namespace": "production"
+}
+```
+
+**範例 39 - 取得所有命名空間的 Service YAML**：
+```json
+{
+  "resource": "services",
+  "allNamespaces": true
+}
+```
+
+**範例 40 - 取得 Node YAML（cluster-scoped 資源）**：
+```json
+{
+  "resource": "nodes"
+}
+```
+
+**YAML 輸出範例**：
+```yaml
+apiVersion: v1
+items:
+- apiVersion: v1
+  kind: Pod
+  metadata:
+    creationTimestamp: "2024-01-01T10:00:00Z"
+    labels:
+      app: my-app
+      version: v1.0.0
+    name: my-app-abc123
+    namespace: default
+    resourceVersion: "12345"
+    uid: a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  spec:
+    containers:
+    - image: my-app:v1.0.0
+      name: my-app
+      ports:
+      - containerPort: 8080
+        protocol: TCP
+      resources:
+        limits:
+          cpu: "1"
+          memory: 1Gi
+        requests:
+          cpu: 100m
+          memory: 128Mi
+  status:
+    conditions:
+    - lastProbeTime: null
+      lastTransitionTime: "2024-01-01T10:00:01Z"
+      status: "True"
+      type: Initialized
+    - lastProbeTime: null
+      lastTransitionTime: "2024-01-01T10:00:05Z"
+      status: "True"
+      type: Ready
+    phase: Running
+    podIP: 10.244.0.10
+    startTime: "2024-01-01T10:00:01Z"
+kind: List
+metadata:
+  resourceVersion: ""
+```
+
+**提示**:
+- 使用此工具可以匯出資源配置進行備份或遷移
+- YAML 輸出包含完整的資源定義和狀態資訊
+- cluster-scoped 資源（如 nodes, pv, namespaces）不支援 namespace 參數
+
+### kubectl_top_nodes
+
+查看 Kubernetes 節點的 CPU 和記憶體使用情況，需要 metrics-server 支援。
+
+**參數**：
+- `sortBy` (可選): 排序方式，可選值為 "cpu", "memory"
+
+**範例 41 - 查看節點資源使用情況**：
+```json
+{}
+```
+
+**範例 42 - 按 CPU 使用量排序**：
+```json
+{
+  "sortBy": "cpu"
+}
+```
+
+**範例 43 - 按記憶體使用量排序**：
+```json
+{
+  "sortBy": "memory"
+}
+```
+
+
+
+**成功輸出範例**：
+```
+節點資源使用情況
+==================================================
+
+找到 3 個節點的資源使用資訊：
+
+NAME                 CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+docker-desktop       248m         3%     1916Mi          24%
+k8s-worker-1         156m         7%     892Mi           22%
+k8s-worker-2         203m         10%    1205Mi          30%
+
+說明：
+• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core
+• 記憶體使用量以 Mi (Mebibytes) 為單位
+• 百分比顯示相對於節點總容量的使用率
+
+提示：
+• 使用 sortBy 參數可按 cpu 或 memory 排序
+• 使用 kubectl_top_pods 查看 Pod 級別的資源使用情況
+```
+
+**metrics-server 未安裝時的輸出範例**：
+```
+錯誤: metrics-server 未安裝。kubectl top 命令需要 metrics-server 才能工作。
+
+安裝方法：
+1. 使用官方 YAML：
+   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+
+2. 使用 Helm：
+   helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+   helm upgrade --install metrics-server metrics-server/metrics-server
+
+3. 如果是本地開發環境（如 minikube、kind），可能需要添加 --kubelet-insecure-tls 參數
+```
+
+**提示**:
+- 此工具會自動檢查 metrics-server 是否安裝和運行
+- 如果 metrics-server 未安裝，會提供詳細的安裝指導
+- 適用於監控節點資源使用、容量規劃和性能調優
+
+### kubectl_top_pods
+
+查看 Kubernetes Pod 的 CPU 和記憶體使用情況，需要 metrics-server 支援。
+
+**參數**：
+- `namespace` (可選): Kubernetes 命名空間，預設為 "default"
+- `allNamespaces` (可選): 查看所有命名空間的 Pod（不能與 namespace 同時使用）
+- `sortBy` (可選): 排序方式，可選值為 "cpu", "memory"
+- `containers` (可選): 顯示容器級別的資源使用情況
+
+**範例 45 - 查看 default namespace 的 Pod 資源使用情況**：
+```json
+{}
+```
+
+**範例 46 - 查看指定 namespace 的 Pod**：
+```json
+{
+  "namespace": "kube-system"
+}
+```
+
+**範例 47 - 查看所有 namespace 的 Pod**：
+```json
+{
+  "allNamespaces": true
+}
+```
+
+**範例 48 - 按 CPU 使用量排序**：
+```json
+{
+  "namespace": "kube-system",
+  "sortBy": "cpu"
+}
+```
+
+**範例 49 - 顯示容器級別資源使用**：
+```json
+{
+  "namespace": "kube-system",
+  "containers": true
+}
+```
+
+**範例 50 - 組合參數**：
+```json
+{
+  "allNamespaces": true,
+  "sortBy": "memory",
+  "containers": true
+}
+```
+
+**成功輸出範例（Pod 級別）**：
+```
+Pod 資源使用情況
+==================================================
+
+找到 11 個 Pod 的資源使用資訊：
+
+NAME                                     CPU(cores)   MEMORY(bytes)
+======================================================================
+coredns-5dd5756b68-8t2zd                 11m          31Mi
+etcd-docker-desktop                      45m          89Mi
+kube-apiserver-docker-desktop            98m          195Mi
+kube-controller-manager-docker-desktop   32m          67Mi
+kube-proxy-9x7k8                         5m           23Mi
+kube-scheduler-docker-desktop            8m           45Mi
+
+說明：
+• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core
+• 記憶體使用量以 Mi (Mebibytes) 為單位
+• 顯示 Pod 級別的資源使用情況
+
+提示：
+• 使用 sortBy 參數可按 cpu 或 memory 排序
+• 使用 containers=true 查看容器級別的資源使用情況
+• 使用 allNamespaces=true 查看所有命名空間的 Pod
+• 使用 kubectl_top_nodes 查看節點級別的資源使用情況
+```
+
+**成功輸出範例（容器級別）**：
+```
+Pod 資源使用情況
+==================================================
+
+找到 15 個容器的資源使用資訊：
+
+POD                                      NAME                     CPU(cores)   MEMORY(bytes)
+========================================================================================
+coredns-5dd5756b68-8t2zd                 coredns                  11m          31Mi
+etcd-docker-desktop                      etcd                     45m          89Mi
+kube-apiserver-docker-desktop            kube-apiserver           98m          195Mi
+kube-controller-manager-docker-desktop   kube-controller-manager  32m          67Mi
+
+說明：
+• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core
+• 記憶體使用量以 Mi (Mebibytes) 為單位
+• 顯示容器級別的詳細資源使用情況
+• 格式：POD_NAME/CONTAINER_NAME
+
+提示：
+• 使用 sortBy 參數可按 cpu 或 memory 排序
+• 使用 containers=true 查看容器級別的資源使用情況
+• 使用 allNamespaces=true 查看所有命名空間的 Pod
+• 使用 kubectl_top_nodes 查看節點級別的資源使用情況
+```
+
+**沒有找到資源時的輸出範例**：
+```
+命名空間 "default" 中沒有找到正在運行的 Pod。
+
+提示：
+• 確保指定的命名空間中有正在運行的 Pod
+• 使用 kubectl_get 查看 Pod 列表：{"resource": "pods", "namespace": "default"}
+• 如果是新叢集，可能需要先部署一些應用程式
+```
+
+**提示**:
+- 此工具會自動檢查 metrics-server 是否安裝和運行
+- 支援 namespace 範圍和跨命名空間查詢
+- containers 參數提供更詳細的容器級別資源監控
+- 適用於 Pod 資源監控、效能調優和容量規劃
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1228,7 +1524,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (19項)
+### 已完成 (22項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1246,6 +1542,9 @@ npm start
 - [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
 - [x] **Get Events** - 取得 Event 列表和詳細資訊
 - [x] **Get Cluster Info** - 取得叢集資訊和服務端點
+- [x] **Get Resource YAML** - 取得資源 YAML 格式輸出
+- [x] **Top Nodes** - 查看 Node 資源使用情況（需要 metrics-server）
+- [x] **Top Pods** - 查看 Pod 資源使用情況（需要 metrics-server）
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -1256,9 +1555,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 監控類 (5項)
-- [ ] **Top Nodes** - 查看 Node 資源使用情況
-- [ ] **Top Pods** - 查看 Pod 資源使用情況
+#### 監控類 (3項)
 - [ ] **Top Containers** - 查看容器資源使用情況
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
@@ -1279,10 +1576,9 @@ npm start
 - [ ] **Copy Files** - 複製檔案到/從 Pod
 - [ ] **Attach to Pod** - 附加到 Pod
 
-#### 管理類 (4項)
+#### 管理類 (3項)
 - [ ] **Filter by Labels** - 按標籤篩選
 - [ ] **Filter by Annotations** - 按註解篩選
-- [ ] **Get Resource YAML** - 取得資源 YAML
 - [ ] **Get Resource Status** - 取得資源狀態
 
 #### 進階功能 (5項)
@@ -1293,10 +1589,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 19項核心功能
-- **待開發**: 26項功能
+- **已完成**: 22項核心功能
+- **待開發**: 23項功能
 - **總計**: 45項功能
-- **完成度**: 42.2%
+- **完成度**: 48.9%
 
 ## 授權
 
