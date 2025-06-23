@@ -179,6 +179,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_describe`
 - **Parameters**: `{"resource": "pod", "name": "your-pod-name", "namespace": "default"}`
 
+**擴縮 Deployment 副本**：
+- **Tool Name**: `kubectl_scale_deployment`
+- **Parameters**: `{"deploymentName": "my-web-app", "replicas": 3, "namespace": "default"}`
+
 ## 可用工具
 
 ### kubectl_get
@@ -1465,6 +1469,92 @@ kube-scheduler-docker-desktop            kube-scheduler           8m           3
 - 比 kubectl_top_pods --containers 提供更豐富的分析功能
 - 適用於微服務架構的容器資源監控和效能調優
 
+### kubectl_scale_deployment
+
+動態調整 Kubernetes Deployment 的副本數量，支援安全驗證、等待機制和詳細狀態追蹤。
+
+**參數**：
+- `deploymentName` (必需): Deployment 名稱
+- `replicas` (必需): 目標副本數量（0-100）
+- `namespace` (可選): Kubernetes 命名空間，預設為 "default"
+- `wait` (可選): 是否等待擴縮完成，預設為 false
+- `timeout` (可選): 等待超時時間（秒，30-1800），預設為 300
+
+**範例 57 - 擴容到 3 個副本**：
+```json
+{
+  "deploymentName": "my-web-app",
+  "replicas": 3,
+  "namespace": "default"
+}
+```
+
+**範例 58 - 縮容到 0（停止服務）**：
+```json
+{
+  "deploymentName": "my-api-service",
+  "replicas": 0,
+  "namespace": "production"
+}
+```
+
+**範例 59 - 擴容並等待完成**：
+```json
+{
+  "deploymentName": "my-worker",
+  "replicas": 5,
+  "namespace": "default",
+  "wait": true,
+  "timeout": 600
+}
+```
+
+**輸出範例**：
+```
+Deployment 擴縮操作結果
+==================================================
+
+操作摘要：
+• Deployment: my-web-app
+• 命名空間: default
+• 原副本數: 1 → 目標副本數: 3
+• 變化: 擴容 (+2 個副本)
+
+狀態對比：
+┌────────────────────┬──────────┬──────────┐
+│ 項目               │ 操作前   │ 操作後   │
+├────────────────────┼──────────┼──────────┤
+│ 期望副本數         │ 1        │ 3        │
+│ 當前副本數         │ 1        │ 3        │
+│ 就緒副本數         │ 1        │ 3        │
+│ 可用副本數         │ 1        │ 3        │
+└────────────────────┴──────────┴──────────┘
+
+操作結果：
+[成功] Deployment 規格已成功更新到目標副本數
+[成功] 所有目標副本已就緒並可用
+
+提示：
+• 此操作未等待完成，Pod 可能仍在啟動或終止中
+• 使用 kubectl_get 檢查 Deployment 狀態：{"resource": "deployments", "namespace": "default", "name": "my-web-app"}
+• 使用 kubectl_get 檢查 Pod 狀態：{"resource": "pods", "namespace": "default"}
+• 使用 kubectl_describe 查看詳細資訊：{"resource": "deployment", "name": "my-web-app", "namespace": "default"}
+```
+
+**安全特性**：
+- 副本數限制在 0-100 範圍內
+- 自動驗證 Deployment 是否存在
+- 提供操作前後狀態對比
+- 支援等待機制確保操作完成
+- 詳細的錯誤處理和格式化輸出
+
+**提示**:
+- 設定 `wait: true` 可確保擴縮操作完全完成
+- 縮容到 0 可用於暫時停止服務
+- 擴容操作會創建新的 Pod，可能需要時間拉取映像
+- 建議先使用 `kubectl_get` 檢查當前 Deployment 狀態
+- 對於生產環境，建議設定較長的 timeout 值
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1662,7 +1752,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (23項)
+### 已完成 (24項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1686,6 +1776,7 @@ npm start
 - [x] **Top Containers** - 查看容器資源使用情況（需要 metrics-server）
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
+- [x] **Scale Deployment** - 擴縮 Deployment 副本數量
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
@@ -1698,9 +1789,8 @@ npm start
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
 
-#### 操作類 (8項)
+#### 操作類 (7項)
 - [ ] **Edit HPA** - 編輯 HorizontalPodAutoscaler
-- [ ] **Scale Deployment** - 擴縮 Deployment
 - [ ] **Restart Deployment** - 重啟 Deployment
 - [ ] **Delete Pod** - 刪除 Pod
 - [ ] **Apply YAML** - 應用 YAML 配置
@@ -1727,10 +1817,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 23項核心功能
-- **待開發**: 22項功能
+- **已完成**: 24項核心功能
+- **待開發**: 21項功能
 - **總計**: 45項功能
-- **完成度**: 51.1%
+- **完成度**: 53.3%
 
 ## 授權
 
