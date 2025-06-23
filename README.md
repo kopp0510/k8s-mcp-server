@@ -271,6 +271,22 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "hpa", "namespace": "default"}`
 
+**取得 ClusterRole 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "clusterroles"}`
+
+**取得特定 ClusterRole**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "clusterroles", "name": "cluster-admin"}`
+
+**取得 ClusterRoleBinding 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "clusterrolebindings"}`
+
+**取得特定 ClusterRoleBinding**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "clusterrolebindings", "name": "cluster-admin"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -316,8 +332,8 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress", "hpa", "namespaces", "events", "serviceaccounts"
-- `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes, pv 和 namespaces 以外的所有資源（cluster-scoped 資源），預設為 "default"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress", "hpa", "namespaces", "events", "serviceaccounts", "clusterroles", "clusterrolebindings"
+- `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes, pv, namespaces, clusterroles, clusterrolebindings 以外的所有資源（cluster-scoped 資源），預設為 "default"
 - `allNamespaces` (可選): 查看所有命名空間的資源 (等同於 kubectl -A 參數，不適用於 cluster-scoped 資源)
 - `name` (可選): 特定資源名稱
 - `labelSelector` (可選): 標籤選擇器，使用 Kubernetes 原生語法 (例如: "app=nginx,environment!=test")
@@ -623,9 +639,39 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
+**範例 37 - 取得所有 ClusterRole**：
+```json
+{
+  "resource": "clusterroles"
+}
+```
+
+**範例 38 - 取得特定 ClusterRole**：
+```json
+{
+  "resource": "clusterroles",
+  "name": "cluster-admin"
+}
+```
+
+**範例 39 - 取得所有 ClusterRoleBinding**：
+```json
+{
+  "resource": "clusterrolebindings"
+}
+```
+
+**範例 40 - 取得特定 ClusterRoleBinding**：
+```json
+{
+  "resource": "clusterrolebindings",
+  "name": "cluster-admin"
+}
+```
+
 **標籤篩選範例**
 
-**範例 37 - 使用標籤選擇器篩選 Pod**：
+**範例 41 - 使用標籤選擇器篩選 Pod**：
 ```json
 {
   "resource": "pods",
@@ -634,7 +680,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 38 - 使用多個標籤條件篩選**：
+**範例 42 - 使用多個標籤條件篩選**：
 ```json
 {
   "resource": "deployments",
@@ -643,7 +689,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 39 - 使用否定條件篩選**：
+**範例 43 - 使用否定條件篩選**：
 ```json
 {
   "resource": "pods",
@@ -652,7 +698,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 40 - 檢查標籤存在性**：
+**範例 44 - 檢查標籤存在性**：
 ```json
 {
   "resource": "services",
@@ -661,7 +707,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 41 - 使用標籤物件篩選**：
+**範例 45 - 使用標籤物件篩選**：
 ```json
 {
   "resource": "pods",
@@ -673,7 +719,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 42 - 使用前綴標籤篩選**：
+**範例 46 - 使用前綴標籤篩選**：
 ```json
 {
   "resource": "deployments",
@@ -685,7 +731,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 43 - 混合使用標籤和其他參數**：
+**範例 47 - 混合使用標籤和其他參數**：
 ```json
 {
   "resource": "configmaps",
@@ -1249,6 +1295,92 @@ SSE 模式 - 專為 n8n 設計
   首次發生: 2024-01-01T12:20:00Z
   最後發生: 2024-01-01T12:20:00Z
   次數: 1
+```
+
+**ClusterRole 輸出範例**：
+```
+找到 68 個 ClusterRole:
+
+• admin
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• cluster-admin
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• edit
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• view
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:node
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:node-bootstrapper
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:node-problem-detector
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:persistent-volume-provisioner
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:kube-dns
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• my-custom-role
+  建立時間: 2024-01-01T10:00:00Z
+  標籤: app=my-app, managed-by=helm
+```
+
+**ClusterRoleBinding 輸出範例**：
+```
+找到 52 個 ClusterRoleBinding:
+
+• cluster-admin
+  角色: ClusterRole/cluster-admin
+  主體:
+  - Group: system:masters
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:node
+  角色: ClusterRole/system:node
+  主體:
+  - Group: system:nodes
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:kube-dns
+  角色: ClusterRole/system:kube-dns
+  主體:
+  - ServiceAccount: kube-system/kube-dns
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• system:node-proxier
+  角色: ClusterRole/system:node-proxier
+  主體:
+  - ServiceAccount: kube-system/kube-proxy
+  建立時間: 2024-01-01T08:00:00Z
+  標籤: kubernetes.io/bootstrapping=rbac-defaults
+
+• my-app-binding
+  角色: ClusterRole/my-custom-role
+  主體:
+  - ServiceAccount: default/my-app-sa
+  - User: my-user@example.com
+  建立時間: 2024-01-01T10:00:00Z
+  標籤: app=my-app, managed-by=helm
 ```
 
 **Cluster Info 輸出範例**：
@@ -2143,7 +2275,7 @@ Pod: my-app-abc123 (namespace: default), container: app
 取得 Kubernetes 資源的詳細描述資訊，包含狀態、事件和配置。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pod", "node", "service", "deployment", "configmap", "secret", "serviceaccount"
+- `resource` (必需): 資源類型，支援 "pod", "node", "service", "deployment", "configmap", "secret", "serviceaccount", "clusterrole", "clusterrolebinding"
 - `name` (必需): 資源名稱
 - `namespace` (可選): Kubernetes 命名空間，僅對有命名空間的資源有效，預設為 "default"
 
@@ -2179,6 +2311,22 @@ Pod: my-app-abc123 (namespace: default), container: app
   "resource": "serviceaccount",
   "name": "my-app-sa",
   "namespace": "default"
+}
+```
+
+**範例 5 - 描述 ClusterRole**：
+```json
+{
+  "resource": "clusterrole",
+  "name": "cluster-admin"
+}
+```
+
+**範例 6 - 描述 ClusterRoleBinding**：
+```json
+{
+  "resource": "clusterrolebinding",
+  "name": "cluster-admin"
 }
 ```
 
@@ -2290,7 +2438,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (27項)
+### 已完成 (29項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -2308,6 +2456,8 @@ npm start
 - [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
 - [x] **Get Events** - 取得 Event 列表和詳細資訊
 - [x] **Get ServiceAccounts** - 取得 ServiceAccount 列表和詳細資訊
+- [x] **Get ClusterRoles** - 取得 ClusterRole 列表和詳細資訊
+- [x] **Get ClusterRoleBindings** - 取得 ClusterRoleBinding 列表和詳細資訊
 - [x] **Get Cluster Info** - 取得叢集資訊和服務端點
 - [x] **Get Resource YAML** - 取得資源 YAML 格式輸出
 - [x] **Top Nodes** - 查看 Node 資源使用情況（需要 metrics-server）
@@ -2333,14 +2483,11 @@ npm start
 - [ ] **Update Resource** - 更新資源
 - [ ] **Delete Resource** - 刪除資源
 
-#### 進階功能 (1項)
-- [ ] **Get ClusterRoles** - 取得叢集角色
-
 ### 功能統計
-- **已完成**: 28項核心功能
-- **待開發**: 5項功能
+- **已完成**: 29項核心功能
+- **待開發**: 4項功能
 - **總計**: 33項功能
-- **完成度**: 84.8%
+- **完成度**: 87.9%
 
 ## 授權
 

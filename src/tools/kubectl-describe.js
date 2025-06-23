@@ -21,7 +21,7 @@ export class KubectlDescribeTool extends BaseTool {
         properties: {
           resource: {
             type: 'string',
-            enum: ['pod', 'node', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'],
+            enum: ['pod', 'node', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount', 'clusterrole', 'clusterrolebinding'],
             description: '資源類型'
           },
           name: {

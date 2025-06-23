@@ -4,7 +4,7 @@ import { validator } from '../utils/validator.js';
 
 export class KubectlGetTool extends BaseTool {
   constructor() {
-    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events, serviceaccounts)，支援標籤選擇器篩選');
+    super('kubectl_get', '取得 Kubernetes 資源 (pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events, serviceaccounts, clusterroles, clusterrolebindings)，支援標籤選擇器篩選');
   }
 
   getDefinition() {
@@ -17,11 +17,11 @@ export class KubectlGetTool extends BaseTool {
           resource: {
             type: 'string',
             description: '資源類型',
-            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts'],
+            enum: ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts', 'clusterroles', 'clusterrolebindings'],
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (適用於除了 nodes, pv 和 namespaces 以外的所有資源)',
+            description: '命名空間 (適用於除了 nodes, pv, namespaces, clusterroles, clusterrolebindings 以外的所有資源)',
           },
           allNamespaces: {
             type: 'boolean',
@@ -82,13 +82,13 @@ export class KubectlGetTool extends BaseTool {
       const { resource, namespace, allNamespaces, name, labelSelector, labels } = args;
 
       // 驗證資源類型
-      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts'];
+      const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts', 'clusterroles', 'clusterrolebindings'];
       if (!supportedResources.includes(resource)) {
         throw new Error(`不支援的資源類型: ${resource}，僅支援 ${supportedResources.join(', ')}`);
       }
 
       // cluster-scoped 資源不支援 namespace 和 allNamespaces
-      const clusterScopedResources = ['nodes', 'pv', 'namespaces'];
+      const clusterScopedResources = ['nodes', 'pv', 'namespaces', 'clusterroles', 'clusterrolebindings'];
       if (clusterScopedResources.includes(resource)) {
         if (namespace) {
           throw new Error(`${resource} 資源不支援 namespace 參數（cluster-scoped 資源）`);

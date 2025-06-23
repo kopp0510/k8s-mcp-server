@@ -24,7 +24,7 @@ export class KubectlGetYamlTool extends BaseTool {
               'pods', 'nodes', 'deployments', 'services', 'replicasets',
               'daemonsets', 'statefulsets', 'jobs', 'cronjobs',
               'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa',
-              'namespaces', 'events'
+              'namespaces', 'events', 'serviceaccounts', 'clusterroles', 'clusterrolebindings'
             ]
           },
           name: {
@@ -76,7 +76,7 @@ export class KubectlGetYamlTool extends BaseTool {
     }
 
     // cluster-scoped 資源不支援 namespace 相關參數
-    const clusterScopedResources = ['nodes', 'pv', 'namespaces'];
+    const clusterScopedResources = ['nodes', 'pv', 'namespaces', 'clusterroles', 'clusterrolebindings'];
     if (clusterScopedResources.includes(resource)) {
       if (namespace) {
         throw new Error(`${resource} 是 cluster-scoped 資源，不支援 namespace 參數`);
