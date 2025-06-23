@@ -255,23 +255,23 @@ async function main() {
       });
 
       app.listen(port, () => {
-        logger.info(`🚀 MCP Server 已啟動在 http://localhost:${port}`);
-        logger.info(`📡 SSE 端點: http://localhost:${port}/sse (n8n 連接這裡)`);
-        logger.info(`📨 訊息端點: http://localhost:${port}/messages`);
-        logger.info(`💚 健康檢查: http://localhost:${port}/health`);
-        logger.info(`🛠️  可用工具: ${availableTools.map(t => t.name).join(', ')}`);
-        logger.info(`ℹ️  SSE 模式 - 專為 n8n 設計`);
+              logger.info(`MCP Server 已啟動在 http://localhost:${port}`);
+      logger.info(`SSE 端點: http://localhost:${port}/sse (n8n 連接這裡)`);
+      logger.info(`訊息端點: http://localhost:${port}/messages`);
+      logger.info(`健康檢查: http://localhost:${port}/health`);
+      logger.info(`可用工具: ${availableTools.map(t => t.name).join(', ')}`);
+      logger.info(`SSE 模式 - 專為 n8n 設計`);
       });
     } else {
       // Stdio 模式 (預設)
-      logger.info('🔌 啟動 MCP Server (stdio 模式)');
+      logger.info('啟動 MCP Server (stdio 模式)');
       const transport = new StdioServerTransport();
       await server.connect(transport);
-      logger.info('✅ MCP Server 已啟動並監聽 stdio');
-      logger.info(`🛠️  可用工具: ${availableTools.map(t => t.name).join(', ')}`);
+      logger.info('MCP Server 已啟動並監聽 stdio');
+      logger.info(`可用工具: ${availableTools.map(t => t.name).join(', ')}`);
     }
   } catch (error) {
-    logger.error('❌ MCP Server 啟動失敗:', error);
+    logger.error('MCP Server 啟動失敗:', error);
     process.exit(1);
   }
 }

@@ -84,14 +84,14 @@ export class KubectlDescribeTool extends BaseTool {
       let errorMessage = error.message || '未知錯誤';
 
       if (errorMessage.includes('not found')) {
-        errorMessage = `❌ 找不到 ${resource} '${name}'`;
+        errorMessage = `找不到 ${resource} '${name}'`;
         if (namespacedResources.includes(resource)) {
           errorMessage += ` (命名空間: ${namespace})`;
         }
       } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('Forbidden')) {
-        errorMessage = `❌ 權限不足，無法描述 ${resource} '${name}'`;
+                  errorMessage = `權限不足，無法描述 ${resource} '${name}'`;
       } else if (errorMessage.includes('connection refused')) {
-        errorMessage = '❌ 無法連接到 Kubernetes 叢集';
+                  errorMessage = '無法連接到 Kubernetes 叢集';
       }
 
       return {
@@ -110,7 +110,7 @@ export class KubectlDescribeTool extends BaseTool {
   formatDescribeOutput(resource, name, namespace, rawOutput) {
     const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret'];
 
-    let header = `📋 ${this.getResourceIcon(resource)} ${resource.toUpperCase()} 詳細資訊: ${name}`;
+    let header = `${resource.toUpperCase()} 詳細資訊: ${name}`;
 
     if (namespacedResources.includes(resource)) {
       header += ` (命名空間: ${namespace})`;
@@ -137,14 +137,14 @@ export class KubectlDescribeTool extends BaseTool {
       if (trimmedLine.includes(':') && !trimmedLine.startsWith(' ') && !trimmedLine.includes('  ')) {
         if (trimmedLine.toLowerCase().includes('events')) {
           inEventsSection = true;
-          output += '📅 **事件記錄:**\n';
+          output += '**事件記錄:**\n';
           output += '```\n';
         } else if (trimmedLine.toLowerCase().includes('conditions')) {
-          output += '🏥 **狀態條件:**\n';
+                      output += '**狀態條件:**\n';
         } else if (trimmedLine.toLowerCase().includes('labels')) {
-          output += '🏷️  **標籤:**\n';
+          output += '**標籤:**\n';
         } else if (trimmedLine.toLowerCase().includes('annotations')) {
-          output += '📝 **註解:**\n';
+          output += '**註解:**\n';
         } else {
           // 其他區段標題
           currentSection = trimmedLine;
@@ -166,7 +166,7 @@ export class KubectlDescribeTool extends BaseTool {
       output += '```\n';
     }
 
-    output += '\n💡 **提示**: 使用 `kubectl_logs` 查看 Pod 日誌，使用 `kubectl_get` 查看資源列表\n';
+    output += '\n**提示**: 使用 `kubectl_logs` 查看 Pod 日誌，使用 `kubectl_get` 查看資源列表\n';
 
     return output;
   }
@@ -175,15 +175,7 @@ export class KubectlDescribeTool extends BaseTool {
    * 取得資源圖示
    */
   getResourceIcon(resource) {
-    const icons = {
-      'pod': '🐳',
-      'node': '🖥️',
-      'service': '🌐',
-      'deployment': '🚀',
-      'configmap': '⚙️',
-      'secret': '🔐'
-    };
-
-    return icons[resource] || '📦';
+    // 移除所有圖示，返回空字串
+    return '';
   }
 }

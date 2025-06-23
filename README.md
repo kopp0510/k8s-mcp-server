@@ -2,15 +2,15 @@
 
 一個簡單、可靠的 MCP (Model Context Protocol) Server，專為 Kubernetes 環境和 n8n 整合而設計。
 
-## 🌟 特色
+## 特色
 
-- ✅ **n8n 原生支援** - 完美支援 n8n MCP Client 節點
-- 🔄 **SSE 連接** - 使用 Server-Sent Events 提供即時雙向通訊
-- 🐳 **Kubernetes 整合** - 提供 kubectl 工具存取
-- 🛡️ **健壯設計** - 從最基礎開始，逐步擴展功能
-- 📝 **中文友好** - 完整的中文介面和文檔
+- **n8n 原生支援** - 完美支援 n8n MCP Client 節點
+- **SSE 連接** - 使用 Server-Sent Events 提供即時雙向通訊
+- **Kubernetes 整合** - 提供 kubectl 工具存取
+- **健壯設計** - 從最基礎開始，逐步擴展功能
+- **中文友好** - 完整的中文介面和文檔
 
-## 🚀 快速開始
+## 快速開始
 
 ### 本地開發
 
@@ -38,7 +38,7 @@ docker build -t k8s-mcp-server .
 docker run -p 3001:3000 k8s-mcp-server
 ```
 
-## 🔌 在 n8n 中使用
+## 在 n8n 中使用
 
 ### 第一步：啟動 MCP Server
 
@@ -52,11 +52,11 @@ npm run start:http -- --port 3001
 伺服器啟動後，你會看到：
 
 ```
-🚀 MCP Server 已啟動在 http://localhost:3001
-📡 SSE 端點: http://localhost:3001/sse (n8n 連接這裡)
-📨 訊息端點: http://localhost:3001/messages
-💚 健康檢查: http://localhost:3001/health
-ℹ️  SSE 模式 - 專為 n8n 設計
+MCP Server 已啟動在 http://localhost:3001
+SSE 端點: http://localhost:3001/sse (n8n 連接這裡)
+訊息端點: http://localhost:3001/messages
+健康檢查: http://localhost:3001/health
+SSE 模式 - 專為 n8n 設計
 ```
 
 ### 第二步：設定 n8n MCP Client
@@ -94,7 +94,7 @@ npm run start:http -- --port 3001
 - **Tool Name**: `kubectl_describe`
 - **Parameters**: `{"resource": "pod", "name": "your-pod-name", "namespace": "default"}`
 
-## 🛠️ 可用工具
+## 可用工具
 
 ### kubectl_get
 
@@ -131,7 +131,7 @@ npm run start:http -- --port 3001
 
 **Pod 輸出範例**：
 ```
-📦 找到 12 個 Pod (命名空間: kube-system):
+找到 12 個 Pod (命名空間: kube-system):
 
 • coredns-76f75df574-abc123
   狀態: Running
@@ -150,7 +150,7 @@ npm run start:http -- --port 3001
 
 **Node 輸出範例**：
 ```
-🖥️ 找到 3 個 Node:
+找到 3 個 Node:
 
 • k8s-master-1
   狀態: Ready
@@ -220,7 +220,7 @@ Pod: my-app-abc123 (namespace: default), container: app
 2024-01-01T12:00:10Z [INFO] 收到新請求: GET /api/health
 2024-01-01T12:00:11Z [INFO] 健康檢查通過
 
-💡 提示: 顯示最新 100 行日誌
+提示: 顯示最新 100 行日誌
 ```
 
 ### kubectl_describe
@@ -260,7 +260,7 @@ Pod: my-app-abc123 (namespace: default), container: app
 
 **Pod 描述輸出範例**：
 ```
-📋 🐳 POD 詳細資訊: my-app-abc123 (命名空間: default)
+POD 詳細資訊: my-app-abc123 (命名空間: default)
 ======================================================
 
 **Name:**
@@ -275,18 +275,18 @@ Pod: my-app-abc123 (namespace: default), container: app
 **Node:**
   k8s-worker-01/10.0.1.5
 
-🏷️ **標籤:**
+**標籤:**
   app=my-app
   version=v1.0.0
 
-🏥 **狀態條件:**
+**狀態條件:**
   Type              Status
   Initialized       True
   Ready             True
   ContainersReady   True
   PodScheduled      True
 
-📅 **事件記錄:**
+**事件記錄:**
 ```
 Normal  Scheduled  2m    default-scheduler  Successfully assigned default/my-app-abc123 to k8s-worker-01
 Normal  Pulling    2m    kubelet            Pulling image "my-app:v1.0.0"
@@ -295,10 +295,10 @@ Normal  Created    1m    kubelet            Created container my-app
 Normal  Started    1m    kubelet            Started container my-app
 ```
 
-💡 **提示**: 使用 `kubectl_logs` 查看 Pod 日誌，使用 `kubectl_get` 查看資源列表
+**提示**: 使用 `kubectl_logs` 查看 Pod 日誌，使用 `kubectl_get` 查看資源列表
 ```
 
-## 🔧 API 端點
+## API 端點
 
 | 端點 | 方法 | 描述 |
 |------|------|------|
@@ -306,7 +306,7 @@ Normal  Started    1m    kubelet            Started container my-app
 | `/sse` | GET | SSE 連接端點 (n8n 連接) |
 | `/messages` | POST | MCP 訊息處理端點 |
 
-## 🐞 疑難排解
+## 疑難排解
 
 ### n8n 連接失敗
 
@@ -346,7 +346,7 @@ http://172.17.0.1:3001/sse            # Linux
 http://k8s-mcp-server-service:3001/sse
 ```
 
-## 📋 運行模式
+## 運行模式
 
 ### SSE 模式 (推薦，n8n 專用)
 ```bash
@@ -364,32 +364,80 @@ npm start
 - 適用於命令列 MCP 客戶端
 - 輕量級，適合腳本使用
 
-## 🔄 開發計劃
+## 開發計劃
 
-### 已完成 ✅
-- [x] 基本 kubectl get pods 工具
-- [x] kubectl get nodes 工具
-- [x] kubectl logs 工具
-- [x] kubectl describe 工具 (pod, node, service, deployment, configmap, secret)
+### 已完成 (4項)
+- [x] **Get Pods** - 取得 Pod 列表和詳細資訊
+- [x] **Get Nodes** - 取得 Node 列表和詳細資訊
+- [x] **Describe Resources** - 描述各種資源的詳細資訊
+- [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
 - [x] SSE 連接支援 (n8n 相容)
 - [x] 健康檢查端點
 - [x] 輸入驗證和安全性
 - [x] 智慧錯誤處理和格式化輸出
 
-### 開發中 🚧
-- [ ] kubectl exec 工具
-- [ ] kubectl apply/delete 工具
-- [ ] 更多資源類型支援
+### 未完成功能 (依分類整理)
 
-### 規劃中 📋
-- [ ] Helm 圖表管理
-- [ ] 叢集監控工具 (metrics, events)
-- [ ] 認證和權限管理 (RBAC)
-- [ ] 配置檔案支援
-- [ ] 更多資源類型 (services, deployments, configmaps)
-- [ ] 批次操作支援
+#### 資源查詢類 (12項)
+- [ ] **Get Deployments** - 取得 Deployment 列表
+- [ ] **Get Services** - 取得 Service 列表
+- [ ] **Get ReplicaSets** - 取得 ReplicaSet 列表
+- [ ] **Get DaemonSets** - 取得 DaemonSet 列表
+- [ ] **Get StatefulSets** - 取得 StatefulSet 列表
+- [ ] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表
+- [ ] **Get ConfigMaps** - 取得 ConfigMap 列表
+- [ ] **Get Secrets** - 取得 Secret 列表
+- [ ] **Get PersistentVolumes** - 取得 PV 列表
+- [ ] **Get PersistentVolumeClaims** - 取得 PVC 列表
+- [ ] **Get Ingress** - 取得 Ingress 列表
+- [ ] **Get HPA** - 取得 HorizontalPodAutoscaler 列表
 
-## 📄 授權
+#### 監控類 (6項)
+- [ ] **Top Nodes** - 查看 Node 資源使用情況
+- [ ] **Top Pods** - 查看 Pod 資源使用情況
+- [ ] **Top Containers** - 查看容器資源使用情況
+- [ ] **Get Node Metrics** - 取得 Node 指標
+- [ ] **Get Pod Metrics** - 取得 Pod 指標
+- [ ] **Get Events** - 取得叢集事件
+
+#### 操作類 (8項)
+- [ ] **Edit HPA** - 編輯 HorizontalPodAutoscaler
+- [ ] **Scale Deployment** - 擴縮 Deployment
+- [ ] **Restart Deployment** - 重啟 Deployment
+- [ ] **Delete Pod** - 刪除 Pod
+- [ ] **Apply YAML** - 應用 YAML 配置
+- [ ] **Create Resource** - 創建資源
+- [ ] **Update Resource** - 更新資源
+- [ ] **Delete Resource** - 刪除資源
+
+#### 互動類 (4項)
+- [ ] **Exec into Pod** - 進入 Pod 執行指令
+- [ ] **Port Forward** - 端口轉發
+- [ ] **Copy Files** - 複製檔案到/從 Pod
+- [ ] **Attach to Pod** - 附加到 Pod
+
+#### 管理類 (5項)
+- [ ] **List Namespaces** - 列出命名空間
+- [ ] **Filter by Labels** - 按標籤篩選
+- [ ] **Filter by Annotations** - 按註解篩選
+- [ ] **Get Resource YAML** - 取得資源 YAML
+- [ ] **Get Resource Status** - 取得資源狀態
+
+#### 進階功能 (6項)
+- [ ] **Stream Pod Logs** - 即時串流 Pod 日誌
+- [ ] **Get Cluster Info** - 取得叢集資訊
+- [ ] **Get ServiceAccounts** - 取得服務帳戶
+- [ ] **Get Roles/RoleBindings** - 取得角色和角色綁定
+- [ ] **Get ClusterRoles** - 取得叢集角色
+- [ ] **Check Permissions** - 檢查權限
+
+### 功能統計
+- **已完成**: 4項核心功能
+- **待開發**: 41項功能
+- **總計**: 45項功能
+- **完成度**: 8.9%
+
+## 授權
 
 MIT License - 詳見 LICENSE 檔案
