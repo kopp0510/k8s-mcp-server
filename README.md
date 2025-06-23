@@ -1327,6 +1327,144 @@ kube-controller-manager-docker-desktop   kube-controller-manager  32m          6
 - containers 參數提供更詳細的容器級別資源監控
 - 適用於 Pod 資源監控、效能調優和容量規劃
 
+### kubectl_top_containers
+
+查看 Kubernetes 容器的詳細 CPU 和記憶體使用情況，專注於容器級別的資源監控，需要 metrics-server 支援。
+
+**參數**：
+- `namespace` (可選): Kubernetes 命名空間，預設為 "default"
+- `allNamespaces` (可選): 查看所有命名空間的容器（不能與 namespace 同時使用）
+- `sortBy` (可選): 排序方式，可選值為 "cpu", "memory"
+- `podName` (可選): 過濾特定 Pod 的容器
+- `containerName` (可選): 過濾包含特定名稱的容器（模糊匹配）
+
+**範例 51 - 查看 default namespace 的容器**：
+```json
+{}
+```
+
+**範例 52 - 查看指定 namespace 的容器**：
+```json
+{
+  "namespace": "kube-system"
+}
+```
+
+**範例 53 - 查看所有 namespace 的容器 - 按 CPU 排序**：
+```json
+{
+  "allNamespaces": true,
+  "sortBy": "cpu"
+}
+```
+
+**範例 54 - 過濾特定 Pod 的容器**：
+```json
+{
+  "allNamespaces": true,
+  "podName": "coredns-5dd5756b68-8t2zd"
+}
+```
+
+**範例 55 - 過濾包含特定名稱的容器**：
+```json
+{
+  "namespace": "kube-system",
+  "containerName": "kube"
+}
+```
+
+**範例 56 - 組合過濾和排序**：
+```json
+{
+  "allNamespaces": true,
+  "containerName": "api",
+  "sortBy": "memory"
+}
+```
+
+**成功輸出範例**：
+```
+容器資源使用情況
+==================================================
+
+找到 15 個容器的資源使用資訊：
+
+統計摘要：
+• 總 CPU 使用量：285m
+• 總記憶體使用量：567Mi
+• 平均 CPU 使用量：19m
+• 平均記憶體使用量：38Mi
+• 涉及 Pod 數量：8
+
+NAMESPACE            POD                                      CONTAINER                CPU(cores)   MEMORY(bytes)
+============================================================================================
+kube-system          coredns-5dd5756b68-8t2zd                 coredns                  11m          31Mi
+kube-system          etcd-docker-desktop                      etcd                     45m          89Mi
+kube-system          kube-apiserver-docker-desktop            kube-apiserver           98m          195Mi
+kube-system          kube-controller-manager-docker-desktop   kube-controller-manager  32m          67Mi
+kube-system          kube-proxy-9x7k8                         kube-proxy               5m           23Mi
+kube-system          kube-scheduler-docker-desktop            kube-scheduler           8m           45Mi
+
+說明：
+• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core
+• 記憶體使用量以 Mi (Mebibytes) 為單位
+• 每一行顯示一個容器的資源使用情況
+• 格式：POD_NAME/CONTAINER_NAME
+• 包含所有命名空間的容器
+
+提示：
+• 使用 sortBy 參數可按 cpu 或 memory 排序
+• 使用 podName 參數可過濾特定 Pod 的容器
+• 使用 containerName 參數可過濾特定名稱的容器
+• 使用 kubectl_top_pods 查看 Pod 級別的資源使用情況
+• 使用 kubectl_top_nodes 查看節點級別的資源使用情況
+```
+
+**過濾輸出範例**：
+```
+容器資源使用情況
+==================================================
+
+找到 3 個容器的資源使用資訊：
+
+統計摘要：
+• 總 CPU 使用量：138m
+• 總記憶體使用量：301Mi
+• 平均 CPU 使用量：46m
+• 平均記憶體使用量：100Mi
+• 涉及 Pod 數量：3
+
+POD                                      CONTAINER                CPU(cores)   MEMORY(bytes)
+===================================================================================
+kube-apiserver-docker-desktop            kube-apiserver           98m          195Mi
+kube-controller-manager-docker-desktop   kube-controller-manager  32m          67Mi
+kube-scheduler-docker-desktop            kube-scheduler           8m           39Mi
+
+說明：
+• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core
+• 記憶體使用量以 Mi (Mebibytes) 為單位
+• 每一行顯示一個容器的資源使用情況
+• 格式：POD_NAME/CONTAINER_NAME
+
+過濾條件：
+• 容器名稱包含：kube
+
+提示：
+• 使用 sortBy 參數可按 cpu 或 memory 排序
+• 使用 podName 參數可過濾特定 Pod 的容器
+• 使用 containerName 參數可過濾特定名稱的容器
+• 使用 kubectl_top_pods 查看 Pod 級別的資源使用情況
+• 使用 kubectl_top_nodes 查看節點級別的資源使用情況
+```
+
+**提示**:
+- 此工具專注於容器級別的詳細資源監控和分析
+- 提供統計摘要：總用量、平均用量、涉及 Pod 數量
+- 支援多種過濾選項：Pod 名稱、容器名稱模糊匹配
+- 比 kubectl_top_pods --containers 提供更豐富的分析功能
+- 適用於微服務架構的容器資源監控和效能調優
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -1524,7 +1662,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (22項)
+### 已完成 (23項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -1545,6 +1683,7 @@ npm start
 - [x] **Get Resource YAML** - 取得資源 YAML 格式輸出
 - [x] **Top Nodes** - 查看 Node 資源使用情況（需要 metrics-server）
 - [x] **Top Pods** - 查看 Pod 資源使用情況（需要 metrics-server）
+- [x] **Top Containers** - 查看容器資源使用情況（需要 metrics-server）
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -1555,8 +1694,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 監控類 (3項)
-- [ ] **Top Containers** - 查看容器資源使用情況
+#### 監控類 (2項)
 - [ ] **Get Node Metrics** - 取得 Node 指標
 - [ ] **Get Pod Metrics** - 取得 Pod 指標
 
@@ -1589,10 +1727,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 22項核心功能
-- **待開發**: 23項功能
+- **已完成**: 23項核心功能
+- **待開發**: 22項功能
 - **總計**: 45項功能
-- **完成度**: 48.9%
+- **完成度**: 51.1%
 
 ## 授權
 
