@@ -80,9 +80,95 @@ curl http://localhost:3001/health
 
 ### Docker 部署
 
+#### 1. 構建映像
+
 ```bash
 docker build -t k8s-mcp-server .
-docker run -p 3001:3000 k8s-mcp-server
+```
+
+#### 2. 啟動容器（需要掛載 kubeconfig）
+
+**⚠️ 重要：** 容器啟動時需要將本機的 `.kube/config` 掛載到容器內的 `/home/nodejs/.kube/config` 路徑，以便 MCP Server 能夠存取 Kubernetes 叢集。
+
+```bash
+# 使用本機 kubeconfig
+docker run -p 3001:3000 \
+  -v ~/.kube/config:/home/nodejs/.kube/config:ro \
+  k8s-mcp-server
+```
+
+#### 3. 自定義 kubeconfig 路徑
+
+```bash
+# 使用自定義 kubeconfig 檔案
+docker run -p 3001:3000 \
+  -v /path/to/your/kubeconfig:/home/nodejs/.kube/config:ro \
+  k8s-mcp-server
+```
+
+#### 4. 使用 service account token（Kubernetes 內部部署）
+
+```bash
+# 在 Kubernetes 叢集內部署時，可以使用 service account
+docker run -p 3001:3000 \
+  -v /var/run/secrets/kubernetes.io/serviceaccount:/var/run/secrets/kubernetes.io/serviceaccount:ro \
+  -e KUBERNETES_SERVICE_HOST \
+  -e KUBERNETES_SERVICE_PORT \
+  k8s-mcp-server
+```
+
+#### 5. 驗證連線
+
+容器啟動後，可以檢查 Kubernetes 連線狀態：
+
+```bash
+# 檢查服務狀態
+curl http://localhost:3001/health
+
+# 測試 Kubernetes 連線
+curl -X POST http://localhost:3001/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "method": "tools/call",
+    "params": {
+      "name": "kubectl_get",
+      "arguments": {"resource": "nodes"}
+    }
+  }'
+```
+
+#### 6. 重要注意事項
+
+**權限要求：**
+- 確保 kubeconfig 檔案具有適當的 Kubernetes 叢集存取權限
+- 建議使用唯讀權限的 service account 來提高安全性
+- 容器以 `nodejs` 使用者身份運行，確保掛載的檔案具有適當的讀取權限
+
+**故障排除：**
+```bash
+# 檢查 kubeconfig 檔案權限
+ls -la ~/.kube/config
+
+# 驗證 kubeconfig 是否有效
+kubectl --kubeconfig ~/.kube/config get nodes
+
+# 檢查容器內的 kubeconfig
+docker exec -it <container-id> cat /home/nodejs/.kube/config
+```
+
+**Docker Compose 範例：**
+```yaml
+version: '3.8'
+services:
+  k8s-mcp-server:
+    build: .
+    ports:
+      - "3001:3000"
+    volumes:
+      - ~/.kube/config:/home/nodejs/.kube/config:ro
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
 ```
 
 ## 在 n8n 中使用
@@ -230,7 +316,7 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress", "hpa", "namespaces", "events"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps", "secrets", "pv", "pvc", "ingress", "hpa", "namespaces", "events", "serviceaccounts"
 - `namespace` (可選): Kubernetes 命名空間，適用於除了 nodes, pv 和 namespaces 以外的所有資源（cluster-scoped 資源），預設為 "default"
 - `allNamespaces` (可選): 查看所有命名空間的資源 (等同於 kubectl -A 參數，不適用於 cluster-scoped 資源)
 - `name` (可選): 特定資源名稱
@@ -471,7 +557,32 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 29 - 使用 -A 參數查看所有命名空間的 Pod**：
+**範例 29 - 取得所有 ServiceAccount**：
+```json
+{
+  "resource": "serviceaccounts",
+  "namespace": "default"
+}
+```
+
+**範例 30 - 取得特定 ServiceAccount**：
+```json
+{
+  "resource": "serviceaccounts",
+  "namespace": "kube-system",
+  "name": "default"
+}
+```
+
+**範例 31 - 取得所有命名空間的 ServiceAccount**：
+```json
+{
+  "resource": "serviceaccounts",
+  "allNamespaces": true
+}
+```
+
+**範例 32 - 使用 -A 參數查看所有命名空間的 Pod**：
 ```json
 {
   "resource": "pods",
@@ -479,7 +590,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 30 - 使用 -A 參數查看所有命名空間的 Deployment**：
+**範例 33 - 使用 -A 參數查看所有命名空間的 Deployment**：
 ```json
 {
   "resource": "deployments",
@@ -487,7 +598,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 31 - 取得預設命名空間的 Event**：
+**範例 34 - 取得預設命名空間的 Event**：
 ```json
 {
   "resource": "events",
@@ -495,7 +606,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 32 - 取得所有命名空間的 Event**：
+**範例 35 - 取得所有命名空間的 Event**：
 ```json
 {
   "resource": "events",
@@ -503,7 +614,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 33 - 取得特定 Event**：
+**範例 36 - 取得特定 Event**：
 ```json
 {
   "resource": "events",
@@ -514,7 +625,7 @@ SSE 模式 - 專為 n8n 設計
 
 **標籤篩選範例**
 
-**範例 34 - 使用標籤選擇器篩選 Pod**：
+**範例 37 - 使用標籤選擇器篩選 Pod**：
 ```json
 {
   "resource": "pods",
@@ -523,7 +634,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 35 - 使用多個標籤條件篩選**：
+**範例 38 - 使用多個標籤條件篩選**：
 ```json
 {
   "resource": "deployments",
@@ -532,7 +643,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 36 - 使用否定條件篩選**：
+**範例 39 - 使用否定條件篩選**：
 ```json
 {
   "resource": "pods",
@@ -541,7 +652,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 37 - 檢查標籤存在性**：
+**範例 40 - 檢查標籤存在性**：
 ```json
 {
   "resource": "services",
@@ -550,7 +661,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 38 - 使用標籤物件篩選**：
+**範例 41 - 使用標籤物件篩選**：
 ```json
 {
   "resource": "pods",
@@ -562,7 +673,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 39 - 使用前綴標籤篩選**：
+**範例 42 - 使用前綴標籤篩選**：
 ```json
 {
   "resource": "deployments",
@@ -574,7 +685,7 @@ SSE 模式 - 專為 n8n 設計
 }
 ```
 
-**範例 40 - 混合使用標籤和其他參數**：
+**範例 43 - 混合使用標籤和其他參數**：
 ```json
 {
   "resource": "configmaps",
@@ -978,6 +1089,40 @@ SSE 模式 - 專為 n8n 設計
   建立時間: 2024-01-01T08:30:00Z
 ```
 
+**ServiceAccount 輸出範例**：
+```
+找到 5 個 ServiceAccount (命名空間: default):
+
+• default
+  Secret 數量: 1
+  - default-token-abc123 (kubernetes.io/service-account-token)
+  建立時間: 2024-01-01T00:00:00Z
+
+• my-app-sa
+  Secret 數量: 2
+  - my-app-token-def456 (kubernetes.io/service-account-token)
+  - my-app-secret-ghi789 (Opaque)
+  建立時間: 2024-01-01T09:00:00Z
+
+• deployment-manager
+  Secret 數量: 1
+  - deployment-token-jkl012 (kubernetes.io/service-account-token)
+  建立時間: 2024-01-01T09:15:00Z
+
+• monitoring-agent
+  Secret 數量: 3
+  - monitoring-token-mno345 (kubernetes.io/service-account-token)
+  - monitoring-config-pqr678 (Opaque)
+  - monitoring-certs-stu901 (kubernetes.io/tls)
+  建立時間: 2024-01-01T10:00:00Z
+
+• backup-service
+  Secret 數量: 2
+  - backup-token-vwx234 (kubernetes.io/service-account-token)
+  - backup-credentials-yz567 (Opaque)
+  建立時間: 2024-01-01T11:00:00Z
+```
+
 **使用 -A 參數的輸出範例**：
 ```
 找到 25 個 Pod (所有命名空間):
@@ -1168,7 +1313,7 @@ SSE 模式 - 專為 n8n 設計
 取得 Kubernetes 資源的 YAML 格式輸出，用於檢查配置、備份或調試。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events
+- `resource` (必需): 資源類型，支援 pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events, serviceaccounts
 - `name` (可選): 資源名稱，如果不提供則取得所有資源
 - `namespace` (可選): 命名空間，僅適用於 namespace-scoped 資源
 - `allNamespaces` (可選): 布林值，是否查看所有命名空間的資源
@@ -1998,7 +2143,7 @@ Pod: my-app-abc123 (namespace: default), container: app
 取得 Kubernetes 資源的詳細描述資訊，包含狀態、事件和配置。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pod", "node", "service", "deployment", "configmap", "secret"
+- `resource` (必需): 資源類型，支援 "pod", "node", "service", "deployment", "configmap", "secret", "serviceaccount"
 - `name` (必需): 資源名稱
 - `namespace` (可選): Kubernetes 命名空間，僅對有命名空間的資源有效，預設為 "default"
 
@@ -2025,6 +2170,15 @@ Pod: my-app-abc123 (namespace: default), container: app
   "resource": "service",
   "name": "my-service",
   "namespace": "production"
+}
+```
+
+**範例 4 - 描述 ServiceAccount**：
+```json
+{
+  "resource": "serviceaccount",
+  "name": "my-app-sa",
+  "namespace": "default"
 }
 ```
 
@@ -2136,7 +2290,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (26項)
+### 已完成 (27項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -2153,6 +2307,7 @@ npm start
 - [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
 - [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
 - [x] **Get Events** - 取得 Event 列表和詳細資訊
+- [x] **Get ServiceAccounts** - 取得 ServiceAccount 列表和詳細資訊
 - [x] **Get Cluster Info** - 取得叢集資訊和服務端點
 - [x] **Get Resource YAML** - 取得資源 YAML 格式輸出
 - [x] **Top Nodes** - 查看 Node 資源使用情況（需要 metrics-server）
@@ -2178,19 +2333,14 @@ npm start
 - [ ] **Update Resource** - 更新資源
 - [ ] **Delete Resource** - 刪除資源
 
-#### 管理類 (1項)
-- [ ] **Filter by Annotations** - 按註解篩選
-
-#### 進階功能 (3項)
-- [ ] **Get ServiceAccounts** - 取得服務帳戶
+#### 進階功能 (1項)
 - [ ] **Get ClusterRoles** - 取得叢集角色
-- [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 27項核心功能
-- **待開發**: 8項功能
-- **總計**: 35項功能
-- **完成度**: 77.1%
+- **已完成**: 28項核心功能
+- **待開發**: 5項功能
+- **總計**: 33項功能
+- **完成度**: 84.8%
 
 ## 授權
 

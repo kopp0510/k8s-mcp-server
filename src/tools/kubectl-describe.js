@@ -21,7 +21,7 @@ export class KubectlDescribeTool extends BaseTool {
         properties: {
           resource: {
             type: 'string',
-            enum: ['pod', 'node', 'service', 'deployment', 'configmap', 'secret'],
+            enum: ['pod', 'node', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'],
             description: '資源類型'
           },
           name: {
@@ -40,7 +40,7 @@ export class KubectlDescribeTool extends BaseTool {
 
   async execute({ resource, name, namespace = 'default' }) {
     // 定義有命名空間的資源類型（移到函數頂部，避免作用域問題）
-    const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret'];
+    const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
 
     try {
       // 驗證輸入
@@ -108,7 +108,7 @@ export class KubectlDescribeTool extends BaseTool {
    * 格式化 describe 輸出
    */
   formatDescribeOutput(resource, name, namespace, rawOutput) {
-    const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret'];
+    const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
 
     let header = `${resource.toUpperCase()} 詳細資訊: ${name}`;
 
