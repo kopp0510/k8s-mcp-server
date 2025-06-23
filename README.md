@@ -151,6 +151,10 @@ SSE 模式 - 專為 n8n 設計
 - **Tool Name**: `kubectl_get`
 - **Parameters**: `{"resource": "configmaps", "namespace": "default"}`
 
+**取得 Secret 列表**：
+- **Tool Name**: `kubectl_get`
+- **Parameters**: `{"resource": "secrets", "namespace": "default"}`
+
 **查看 Pod 日誌**：
 - **Tool Name**: `kubectl_logs`
 - **Parameters**: `{"pod": "your-pod-name", "namespace": "default"}`
@@ -166,7 +170,7 @@ SSE 模式 - 專為 n8n 設計
 強大的 Kubernetes 資源取得工具，支援多種資源類型。
 
 **參數**：
-- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs" 或 "configmaps"
+- `resource` (必需): 資源類型，支援 "pods", "nodes", "deployments", "services", "replicasets", "daemonsets", "statefulsets", "jobs", "cronjobs", "configmaps" 或 "secrets"
 - `namespace` (可選): Kubernetes 命名空間，適用於所有資源類型（除了 nodes），預設為 "default"
 - `name` (可選): 特定資源名稱
 
@@ -309,6 +313,23 @@ SSE 模式 - 專為 n8n 設計
   "resource": "configmaps",
   "namespace": "kube-system",
   "name": "kube-proxy"
+}
+```
+
+**範例 18 - 取得所有 Secret**：
+```json
+{
+  "resource": "secrets",
+  "namespace": "default"
+}
+```
+
+**範例 19 - 取得特定 Secret**：
+```json
+{
+  "resource": "secrets",
+  "namespace": "kube-system",
+  "name": "default-token"
 }
 ```
 
@@ -535,6 +556,31 @@ SSE 模式 - 專為 n8n 設計
   建立時間: 2024-01-01T09:30:00Z
 ```
 
+**Secret 輸出範例**：
+```
+找到 3 個 Secret (命名空間: default):
+
+• database-credentials
+  類型: Opaque
+  Data: 2 項
+  - username: [8 bytes]
+  - password: [16 bytes]
+  建立時間: 2024-01-01T08:00:00Z
+
+• tls-certificate
+  類型: kubernetes.io/tls
+  Data: 2 項
+  - tls.crt: [1.4KB]
+  - tls.key: [1.7KB]
+  建立時間: 2024-01-01T08:15:00Z
+
+• registry-secret
+  類型: kubernetes.io/dockerconfigjson
+  Data: 1 項
+  - .dockerconfigjson: [256 bytes]
+  建立時間: 2024-01-01T08:30:00Z
+```
+
 ### kubectl_logs
 
 取得 Pod 的日誌，支援多種篩選和格式選項。
@@ -732,7 +778,7 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (11項)
+### 已完成 (12項)
 - [x] **Get Pods** - 取得 Pod 列表和詳細資訊
 - [x] **Get Nodes** - 取得 Node 列表和詳細資訊
 - [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
@@ -742,6 +788,7 @@ npm start
 - [x] **Get StatefulSets** - 取得 StatefulSet 列表和詳細資訊
 - [x] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表和詳細資訊
 - [x] **Get ConfigMaps** - 取得 ConfigMap 列表和詳細資訊
+- [x] **Get Secrets** - 取得 Secret 列表和詳細資訊
 - [x] **Describe Resources** - 描述各種資源的詳細資訊
 - [x] **Get Pod Logs** - 查看 Pod 日誌
 - [x] 模組化工具架構
@@ -752,8 +799,7 @@ npm start
 
 ### 未完成功能 (依分類整理)
 
-#### 資源查詢類 (5項)
-- [ ] **Get Secrets** - 取得 Secret 列表
+#### 資源查詢類 (4項)
 - [ ] **Get PersistentVolumes** - 取得 PV 列表
 - [ ] **Get PersistentVolumeClaims** - 取得 PVC 列表
 - [ ] **Get Ingress** - 取得 Ingress 列表
@@ -799,10 +845,10 @@ npm start
 - [ ] **Check Permissions** - 檢查權限
 
 ### 功能統計
-- **已完成**: 11項核心功能
-- **待開發**: 34項功能
+- **已完成**: 12項核心功能
+- **待開發**: 33項功能
 - **總計**: 45項功能
-- **完成度**: 24.4%
+- **完成度**: 26.7%
 
 ## 授權
 
