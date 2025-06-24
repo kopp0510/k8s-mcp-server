@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 
 /**
- * K8s MCP Server 主程式入口
- * 處理生命週期和參數解析
+ * K8s MCP Server Main Entry Point
+ * Handles lifecycle and parameter parsing
  */
 
 import { logger } from './utils/logger.js';
 import { createMCPServer } from './server.js';
 
 /**
- * 解析命令列參數
+ * Parse command line arguments
  */
 function parseArguments() {
   const args = process.argv.slice(2);
@@ -25,20 +25,20 @@ function parseArguments() {
 }
 
 /**
- * 設定環境變數
+ * Setup environment variables
  */
 function setupEnvironment(config) {
-  // 設定日誌等級
+  // Set log level
   if (config.logLevel) {
     process.env.LOG_LEVEL = config.logLevel;
   }
 
-  // 設定執行環境
+  // Set execution environment
   if (config.nodeEnv) {
     process.env.NODE_ENV = config.nodeEnv;
   }
 
-  logger.info('環境設定完成', {
+  logger.info('Environment setup completed', {
     nodeEnv: config.nodeEnv,
     logLevel: config.logLevel,
     httpMode: config.httpMode,
@@ -47,77 +47,77 @@ function setupEnvironment(config) {
 }
 
 /**
- * 處理程式退出
+ * Handle graceful shutdown
  */
 function setupGracefulShutdown(server) {
   const shutdown = async (signal) => {
-    logger.info(`收到 ${signal} 信號，準備關閉伺服器...`);
+    logger.info(`Received ${signal} signal, preparing to shutdown server...`);
 
     try {
       if (server && typeof server.close === 'function') {
         await server.close();
       }
-      logger.info('伺服器已正常關閉');
+      logger.info('Server shutdown completed gracefully');
       process.exit(0);
     } catch (error) {
-      logger.error('關閉伺服器時發生錯誤:', error);
+      logger.error('Error occurred while shutting down server:', error);
       process.exit(1);
     }
   };
 
   process.on('SIGTERM', () => shutdown('SIGTERM'));
   process.on('SIGINT', () => shutdown('SIGINT'));
-  process.on('SIGUSR2', () => shutdown('SIGUSR2')); // nodemon 重啟信號
+  process.on('SIGUSR2', () => shutdown('SIGUSR2')); // nodemon restart signal
 }
 
 /**
- * 處理未捕獲的異常
+ * Handle uncaught exceptions
  */
 function setupErrorHandlers() {
   process.on('uncaughtException', (error) => {
-    logger.error('未捕獲的異常:', error);
+    logger.error('Uncaught exception:', error);
     process.exit(1);
   });
 
   process.on('unhandledRejection', (reason, promise) => {
-    logger.error('未處理的 Promise 拒絕:', { reason, promise });
+    logger.error('Unhandled Promise rejection:', { reason, promise });
     process.exit(1);
   });
 }
 
 /**
- * 主函數
+ * Main function
  */
 async function main() {
   try {
-    // 解析參數
+    // Parse arguments
     const config = parseArguments();
 
-    // 設定環境
+    // Setup environment
     setupEnvironment(config);
 
-    // 設定錯誤處理
+    // Setup error handlers
     setupErrorHandlers();
 
-    // 創建並啟動伺服器
-    logger.info('正在啟動 K8s MCP Server...');
+    // Create and start server
+    logger.info('Starting K8s MCP Server...');
     const server = await createMCPServer(config);
 
-    // 設定優雅關閉
+    // Setup graceful shutdown
     setupGracefulShutdown(server);
 
-    logger.info('K8s MCP Server 啟動完成');
+    logger.info('K8s MCP Server startup completed');
 
   } catch (error) {
-    logger.error('啟動失敗:', error);
+    logger.error('Startup failed:', error);
     process.exit(1);
   }
 }
 
-// 如果直接執行此檔案
+// If executing this file directly
 if (import.meta.url === `file://${process.argv[1]}`) {
   main().catch(error => {
-    logger.error('應用程式錯誤:', error);
+    logger.error('Application error:', error);
     process.exit(1);
   });
 }

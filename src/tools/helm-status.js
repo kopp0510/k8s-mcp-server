@@ -1,6 +1,6 @@
 /**
- * Helm Status 工具
- * 查看 Helm release 的詳細狀態
+ * Helm Status Tool
+ * View detailed status of Helm release
  */
 
 import { BaseTool } from './base-tool.js';
@@ -8,7 +8,7 @@ import { helm } from '../utils/helm.js';
 
 export class HelmStatusTool extends BaseTool {
   constructor() {
-    super('helm_status', '查看 Helm release 的詳細狀態資訊');
+    super('helm_status', 'View detailed status information of Helm release');
   }
 
   getDefinition() {
@@ -20,25 +20,25 @@ export class HelmStatusTool extends BaseTool {
         properties: {
           releaseName: {
             type: 'string',
-            description: 'Helm release 名稱'
+            description: 'Helm release name'
           },
           namespace: {
             type: 'string',
-            description: 'Kubernetes 命名空間（可選）'
+            description: 'Kubernetes namespace (optional)'
           },
           revision: {
             type: 'integer',
-            description: '指定修訂版本號（可選，預設為最新版本）',
+            description: 'Specify revision number (optional, defaults to latest version)',
             minimum: 1
           },
           showResources: {
             type: 'boolean',
-            description: '顯示相關的 Kubernetes 資源（預設：false）',
+            description: 'Show related Kubernetes resources (default: false)',
             default: false
           },
           showHooks: {
             type: 'boolean',
-            description: '顯示 Helm hooks（預設：false）',
+            description: 'Show Helm hooks (default: false)',
             default: false
           }
         },
@@ -59,7 +59,7 @@ export class HelmStatusTool extends BaseTool {
         showHooks = false
       } = args;
 
-      // 建構 helm status 指令
+      // Build helm status command
       const command = this.buildHelmStatusCommand({
         releaseName,
         namespace,
@@ -68,10 +68,10 @@ export class HelmStatusTool extends BaseTool {
         showHooks
       });
 
-      // 執行指令
+      // Execute command
       const output = await helm.execute(command);
 
-      // 格式化輸出
+      // Format output
       const formattedOutput = this.formatStatusOutput(output, args);
 
       this.logSuccess(args, { content: [{ text: formattedOutput }] });
@@ -94,22 +94,22 @@ export class HelmStatusTool extends BaseTool {
 
     let command = ['status', releaseName];
 
-    // 命名空間參數
+    // Namespace parameter
     if (namespace) {
       command.push('--namespace', namespace);
     }
 
-    // 修訂版本
+    // Revision
     if (revision) {
       command.push('--revision', revision.toString());
     }
 
-    // 顯示資源
+    // Show resources
     if (showResources) {
       command.push('--show-resources');
     }
 
-    // 顯示 hooks
+    // Show hooks
     if (showHooks) {
       command.push('--show-hooks');
     }
@@ -120,28 +120,28 @@ export class HelmStatusTool extends BaseTool {
   formatStatusOutput(output, args) {
     const { releaseName, namespace, revision } = args;
 
-    let result = `Helm Release 狀態\n`;
+    let result = `Helm Release Status\n`;
     result += `==================================================\n\n`;
 
-    result += `**Release 資訊:**\n`;
-    result += `• 名稱: ${releaseName}\n`;
+    result += `**Release Information:**\n`;
+    result += `• Name: ${releaseName}\n`;
     if (namespace) {
-      result += `• 命名空間: ${namespace}\n`;
+      result += `• Namespace: ${namespace}\n`;
     }
     if (revision) {
-      result += `• 指定修訂版本: ${revision}\n`;
+      result += `• Specified revision: ${revision}\n`;
     }
     result += `\n`;
 
-    // 添加原始輸出
-    result += `**詳細狀態:**\n`;
+    // Add original output
+    result += `**Detailed Status:**\n`;
     result += `${output}\n`;
 
-    result += `**相關操作提示:**\n`;
-    result += `• 使用 helm_list 查看所有 releases\n`;
-    result += `• 使用 helm_get_values 查看配置值\n`;
-    result += `• 使用 helm_history 查看修訂歷史\n`;
-    result += `• 使用 helm_get_manifest 查看生成的 Kubernetes 資源\n`;
+    result += `**Related Operation Tips:**\n`;
+    result += `• Use helm_list to view all releases\n`;
+    result += `• Use helm_get_values to view configuration values\n`;
+    result += `• Use helm_history to view revision history\n`;
+    result += `• Use helm_get_manifest to view generated Kubernetes resources\n`;
 
     return result;
   }
@@ -150,21 +150,21 @@ export class HelmStatusTool extends BaseTool {
     const { releaseName, namespace } = args;
 
     if (errorMessage.includes('not found')) {
-      let result = `Release "${releaseName}" 不存在。\n\n`;
+      let result = `Release "${releaseName}" does not exist.\n\n`;
 
       if (namespace) {
-        result += `在命名空間 "${namespace}" 中找不到該 release。\n\n`;
+        result += `Cannot find this release in namespace "${namespace}".\n\n`;
       }
 
-      result += `可能的原因：\n`;
-      result += `• Release 名稱拼寫錯誤\n`;
-      result += `• Release 在不同的命名空間中\n`;
-      result += `• Release 已被卸載\n\n`;
+      result += `Possible reasons:\n`;
+      result += `• Release name is misspelled\n`;
+      result += `• Release is in a different namespace\n`;
+      result += `• Release has been uninstalled\n\n`;
 
-      result += `建議操作：\n`;
-      result += `• 使用 helm_list 查看所有可用的 releases\n`;
-      result += `• 使用 helm_list 並設定 allNamespaces=true 跨命名空間搜尋\n`;
-      result += `• 檢查 release 名稱是否正確\n`;
+      result += `Suggested actions:\n`;
+      result += `• Use helm_list to view all available releases\n`;
+      result += `• Use helm_list and set allNamespaces=true to search across namespaces\n`;
+      result += `• Check if the release name is correct\n`;
 
       return result;
     }

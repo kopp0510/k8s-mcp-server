@@ -1,14 +1,14 @@
 /**
- * 查看 Kubernetes Pod 資源使用情況
- * 需要 metrics-server 支援
+ * View Kubernetes Pod resource usage
+ * Requires metrics-server support
  */
 
 import { BaseTool } from './base-tool.js';
-import { kubectl } from '../utils/kubectl.js';
+import { KubernetesCommandRunner } from '../utils/command-runner.js';
 
 export class KubectlTopPodsTool extends BaseTool {
   constructor() {
-    super('kubectl_top_pods', '查看 Kubernetes Pod 的 CPU 和記憶體使用情況（需要 metrics-server）');
+    super('kubectl_top_pods', 'View CPU and memory usage of Kubernetes Pods (requires metrics-server)');
   }
 
   getDefinition() {
@@ -20,20 +20,20 @@ export class KubectlTopPodsTool extends BaseTool {
         properties: {
           namespace: {
             type: 'string',
-            description: 'Kubernetes 命名空間（預設：default）'
+            description: 'Kubernetes namespace (default: default)'
           },
           allNamespaces: {
             type: 'boolean',
-            description: '查看所有命名空間的 Pod（不能與 namespace 同時使用）'
+            description: 'View Pods from all namespaces (cannot be used with namespace)'
           },
           sortBy: {
             type: 'string',
-            description: '排序方式',
+            description: 'Sort order',
             enum: ['cpu', 'memory']
           },
           containers: {
             type: 'boolean',
-            description: '顯示容器級別的資源使用情況'
+            description: 'Show container-level resource usage'
           }
         },
         required: []
@@ -43,35 +43,31 @@ export class KubectlTopPodsTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
-
       const { namespace = 'default', allNamespaces, sortBy, containers } = args;
+      const runner = new KubernetesCommandRunner();
 
-      // 驗證參數組合
+      // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
 
-      // 檢查 metrics-server 是否安裝和運行
-      await this.checkMetricsServer();
+      // Check if metrics-server is installed and running
+      await this.checkMetricsServer(runner);
 
-      // 構建 kubectl top pods 命令
+      // Build kubectl top pods command
       const command = this.buildTopCommand(namespace, allNamespaces, sortBy, containers);
 
-      // 執行命令
-      const result = await kubectl.execute(command);
+      // Execute command
+      const result = await runner.run('kubectl', command);
 
-      // 格式化輸出
-      const formattedResult = this.formatTopOutput(result, allNamespaces, containers);
+      // Format output
+      const formattedResult = this.formatTopOutput(result.stdout, allNamespaces, containers);
 
-      this.logSuccess(args, formattedResult);
       return this.createResponse(formattedResult);
 
     } catch (error) {
-      this.logError(args, error);
-
-      // 檢查是否是 "沒有找到資源" 的情況
+      // Check if it's a "no resources found" situation
       if (error.message.includes('No resources found')) {
-        const namespaceInfo = allNamespaces ? '所有命名空間中' : `命名空間 "${namespace}" 中`;
-        return this.createResponse(`${namespaceInfo}沒有找到正在運行的 Pod。\n\n提示：\n• 確保指定的命名空間中有正在運行的 Pod\n• 使用 kubectl_get 查看 Pod 列表：{"resource": "pods", "namespace": "${namespace}"}\n• 如果是新叢集，可能需要先部署一些應用程式`);
+        const namespaceInfo = allNamespaces ? 'all namespaces' : `namespace "${namespace}"`;
+        return this.createResponse(`No running Pods found in ${namespaceInfo}.\n\nTips:\n• Ensure there are running Pods in the specified namespace\n• Use kubectl_get to view Pod list: {"resource": "pods", "namespace": "${namespace}"}\n• For new clusters, you may need to deploy some applications first`);
       }
 
       return this.createErrorResponse(error.message);
@@ -80,63 +76,63 @@ export class KubectlTopPodsTool extends BaseTool {
 
   validateParameterCombination(namespace, allNamespaces) {
     if (namespace !== 'default' && allNamespaces) {
-      throw new Error('不能同時指定 namespace 和 allNamespaces 參數');
+      throw new Error('Cannot specify both namespace and allNamespaces parameters');
     }
   }
 
-  async checkMetricsServer() {
+  async checkMetricsServer(runner) {
     try {
-      // 檢查 metrics-server deployment 是否存在
+      // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await kubectl.execute(checkCommand);
+      const result = await runner.run('kubectl', checkCommand);
 
-      const deployment = JSON.parse(result);
+      const deployment = JSON.parse(result.stdout);
 
-      // 檢查 deployment 狀態
+      // Check deployment status
       const status = deployment.status;
       const readyReplicas = status.readyReplicas || 0;
       const replicas = status.replicas || 0;
 
       if (readyReplicas === 0 || readyReplicas < replicas) {
         throw new Error(
-          'metrics-server 已安裝但未就緒。請等待 metrics-server 完全啟動後再試。\n' +
-          '檢查狀態：kubectl get pods -n kube-system -l k8s-app=metrics-server'
+          'metrics-server is installed but not ready. Please wait for metrics-server to fully start up and try again.\n' +
+          'Check status: kubectl get pods -n kube-system -l k8s-app=metrics-server'
         );
       }
 
     } catch (error) {
       if (error.message.includes('not found')) {
         throw new Error(
-          'metrics-server 未安裝。kubectl top 命令需要 metrics-server 才能工作。\n\n' +
-          '安裝方法：\n' +
-          '1. 使用官方 YAML：\n' +
+          'metrics-server is not installed. kubectl top command requires metrics-server to work.\n\n' +
+          'Installation methods:\n' +
+          '1. Using official YAML:\n' +
           '   kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml\n\n' +
-          '2. 使用 Helm：\n' +
+          '2. Using Helm:\n' +
           '   helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/\n' +
           '   helm upgrade --install metrics-server metrics-server/metrics-server\n\n' +
-          '3. 如果是本地開發環境（如 minikube、kind），可能需要添加 --kubelet-insecure-tls 參數'
+          '3. For local development environments (like minikube, kind), you may need to add --kubelet-insecure-tls parameter'
         );
       }
 
-      if (error.message.includes('未就緒')) {
+      if (error.message.includes('not ready')) {
         throw error;
       }
 
-      throw new Error(`檢查 metrics-server 時發生錯誤: ${error.message}`);
+      throw new Error(`Error checking metrics-server: ${error.message}`);
     }
   }
 
   buildTopCommand(namespace, allNamespaces, sortBy, containers) {
     let command = ['top', 'pods'];
 
-    // 添加命名空間參數
+    // Add namespace parameter
     if (allNamespaces) {
       command.push('--all-namespaces');
     } else {
       command.push('-n', namespace);
     }
 
-    // 添加排序參數（kubectl top pods 只支援 cpu 和 memory）
+    // Add sort parameter (kubectl top pods only supports cpu and memory)
     if (sortBy) {
       switch (sortBy) {
         case 'cpu':
@@ -148,7 +144,7 @@ export class KubectlTopPodsTool extends BaseTool {
       }
     }
 
-    // 添加容器級別參數
+    // Add container-level parameter
     if (containers) {
       command.push('--containers');
     }
@@ -160,24 +156,24 @@ export class KubectlTopPodsTool extends BaseTool {
     const lines = rawOutput.trim().split('\n');
 
     if (lines.length < 2) {
-      return '沒有找到 Pod 資源使用資訊';
+      return 'No Pod resource usage information found';
     }
 
-    // 解析標題行
+    // Parse header line
     const header = lines[0];
     const dataLines = lines.slice(1);
 
-    let formatted = `Pod 資源使用情況\n`;
+    let formatted = `Pod Resource Usage\n`;
     formatted += `==================================================\n\n`;
 
-    // 根據模式顯示不同的摘要
+    // Show different summary based on mode
     if (containers) {
-      formatted += `找到 ${dataLines.length} 個容器的資源使用資訊：\n\n`;
+      formatted += `Found resource usage information for ${dataLines.length} containers:\n\n`;
     } else {
-      formatted += `找到 ${dataLines.length} 個 Pod 的資源使用資訊：\n\n`;
+      formatted += `Found resource usage information for ${dataLines.length} Pods:\n\n`;
     }
 
-    // 格式化表格
+    // Format table
     formatted += `${header}\n`;
     formatted += `${'='.repeat(header.length)}\n`;
 
@@ -185,27 +181,25 @@ export class KubectlTopPodsTool extends BaseTool {
       formatted += `${line}\n`;
     });
 
-    // 添加說明
-    formatted += `\n說明：\n`;
-    formatted += `• CPU 使用量以 millicores (m) 為單位，1000m = 1 CPU core\n`;
-    formatted += `• 記憶體使用量以 Mi (Mebibytes) 為單位\n`;
+    // Add explanations
+    formatted += `\nExplanation:\n`;
+    formatted += `• CPU usage is in millicores (m), 1000m = 1 CPU core\n`;
+    formatted += `• Memory usage is in Mi (Mebibytes)\n`;
 
     if (containers) {
-      formatted += `• 顯示容器級別的詳細資源使用情況\n`;
-      formatted += `• 格式：POD_NAME/CONTAINER_NAME\n`;
+      formatted += `• Shows detailed resource usage at container level\n`;
+      formatted += `• Format: POD_NAME/CONTAINER_NAME\n`;
     } else {
-      formatted += `• 顯示 Pod 級別的資源使用情況\n`;
+      formatted += `• Shows resource usage at Pod level\n`;
     }
 
     if (allNamespaces) {
-      formatted += `• 包含所有命名空間的 Pod\n`;
+      formatted += `• Data from all namespaces\n`;
+    } else {
+      formatted += `• Data from the specified namespace only\n`;
     }
 
-    formatted += `\n提示：\n`;
-    formatted += `• 使用 sortBy 參數可按 cpu 或 memory 排序\n`;
-    formatted += `• 使用 containers=true 查看容器級別的資源使用情況\n`;
-    formatted += `• 使用 allNamespaces=true 查看所有命名空間的 Pod\n`;
-    formatted += `• 使用 kubectl_top_nodes 查看節點級別的資源使用情況`;
+    formatted += `\nNote: Data provided by metrics-server, may have slight delay\n`;
 
     return formatted;
   }

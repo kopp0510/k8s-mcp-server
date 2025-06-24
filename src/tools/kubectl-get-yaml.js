@@ -1,13 +1,13 @@
 /**
- * 取得 Kubernetes 資源的 YAML 格式輸出
+ * Get Kubernetes resource YAML format output
  */
 
 import { BaseTool } from './base-tool.js';
-import { kubectl } from '../utils/kubectl.js';
+import { KubernetesCommandRunner } from '../utils/command-runner.js';
 
 export class KubectlGetYamlTool extends BaseTool {
   constructor() {
-    super('kubectl_get_yaml', '取得 Kubernetes 資源的 YAML 格式輸出，用於檢查配置、備份或調試');
+    super('kubectl_get_yaml', 'Get YAML format output of Kubernetes resources for configuration inspection, backup or debugging');
   }
 
   getDefinition() {
@@ -19,7 +19,7 @@ export class KubectlGetYamlTool extends BaseTool {
         properties: {
           resource: {
             type: 'string',
-            description: '要取得的資源類型',
+            description: 'Resource type to get',
             enum: [
               'pods', 'nodes', 'deployments', 'services', 'replicasets',
               'daemonsets', 'statefulsets', 'jobs', 'cronjobs',
@@ -29,15 +29,15 @@ export class KubectlGetYamlTool extends BaseTool {
           },
           name: {
             type: 'string',
-            description: '資源名稱（可選，如果不提供則取得所有資源）'
+            description: 'Resource name (optional, if not provided gets all resources)'
           },
           namespace: {
             type: 'string',
-            description: '命名空間（僅適用於 namespace-scoped 資源）'
+            description: 'Namespace (only applicable to namespace-scoped resources)'
           },
           allNamespaces: {
             type: 'boolean',
-            description: '是否查看所有命名空間的資源'
+            description: 'Whether to view resources from all namespaces'
           }
         },
         required: ['resource']
@@ -47,42 +47,39 @@ export class KubectlGetYamlTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
-
       const { resource, name, namespace, allNamespaces } = args;
+      const runner = new KubernetesCommandRunner();
 
-      // 驗證參數組合
+      // Validate parameter combination
       this.validateParameterCombination(resource, namespace, allNamespaces);
 
-      // 構建 kubectl 命令
+      // Build kubectl command
       const command = this.buildKubectlCommand(resource, name, namespace, allNamespaces);
 
-      // 執行命令
-      const result = await kubectl.execute(command);
+      // Execute command
+      const result = await runner.run('kubectl', command);
 
-      this.logSuccess(args, result);
-      return this.createResponse(result);
+      return this.createResponse(result.stdout);
 
     } catch (error) {
-      this.logError(args, error);
       return this.createErrorResponse(error.message);
     }
   }
 
   validateParameterCombination(resource, namespace, allNamespaces) {
-    // namespace 和 allNamespaces 不能同時使用
+    // namespace and allNamespaces cannot be used together
     if (namespace && allNamespaces) {
-      throw new Error('不能同時指定 namespace 和 allNamespaces 參數');
+      throw new Error('Cannot specify both namespace and allNamespaces parameters');
     }
 
-    // cluster-scoped 資源不支援 namespace 相關參數
+    // cluster-scoped resources do not support namespace-related parameters
     const clusterScopedResources = ['nodes', 'pv', 'namespaces', 'clusterroles', 'clusterrolebindings'];
     if (clusterScopedResources.includes(resource)) {
       if (namespace) {
-        throw new Error(`${resource} 是 cluster-scoped 資源，不支援 namespace 參數`);
+        throw new Error(`${resource} is a cluster-scoped resource, does not support namespace parameter`);
       }
       if (allNamespaces) {
-        throw new Error(`${resource} 是 cluster-scoped 資源，不支援 allNamespaces 參數`);
+        throw new Error(`${resource} is a cluster-scoped resource, does not support allNamespaces parameter`);
       }
     }
   }
@@ -90,15 +87,15 @@ export class KubectlGetYamlTool extends BaseTool {
   buildKubectlCommand(resource, name, namespace, allNamespaces) {
     let command = ['get', resource];
 
-    // 添加資源名稱
+    // Add resource name
     if (name) {
       command.push(name);
     }
 
-    // 添加輸出格式
+    // Add output format
     command.push('-o', 'yaml');
 
-    // 添加命名空間參數
+    // Add namespace parameters
     if (namespace) {
       command.push('--namespace', namespace);
     } else if (allNamespaces) {

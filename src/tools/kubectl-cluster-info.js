@@ -1,14 +1,14 @@
 /**
- * Kubectl Cluster Info 工具
- * 取得 Kubernetes 叢集資訊，包含控制平面和服務端點
+ * Kubectl Cluster Info Tool
+ * Get Kubernetes cluster information, including control plane and service endpoints
  */
 
 import { BaseTool } from './base-tool.js';
-import { kubectl } from '../utils/kubectl.js';
+import { KubernetesCommandRunner } from '../utils/command-runner.js';
 
 export class KubectlClusterInfoTool extends BaseTool {
   constructor() {
-    super('kubectl_cluster_info', '取得 Kubernetes 叢集資訊，包含控制平面和服務端點');
+    super('kubectl_cluster_info', 'Get Kubernetes cluster information, including control plane and service endpoints');
   }
 
   getDefinition() {
@@ -20,7 +20,7 @@ export class KubectlClusterInfoTool extends BaseTool {
         properties: {
           dump: {
             type: 'boolean',
-            description: '取得詳細的叢集狀態轉儲資訊 (等同於 kubectl cluster-info dump)',
+            description: 'Get detailed cluster state dump information (equivalent to kubectl cluster-info dump)',
             default: false,
           },
         },
@@ -31,77 +31,93 @@ export class KubectlClusterInfoTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
-
       const { dump = false } = args;
+      const runner = new KubernetesCommandRunner();
 
-      // 建構 kubectl 指令
-      const kubectlArgs = ['cluster-info'];
-
+      // Build kubectl command
+      const cmdArgs = ['cluster-info'];
       if (dump) {
-        kubectlArgs.push('dump');
+        cmdArgs.push('dump');
       }
 
-      // 執行指令
-      const result = await kubectl.execute(kubectlArgs);
+      // Execute command
+      const result = await runner.run('kubectl', cmdArgs);
 
-      // 如果是 dump 模式，直接回傳原始輸出
+      // If dump mode, return raw output directly
       if (dump) {
-        this.logSuccess(args, { content: [{ text: result }] });
-        return this.createResponse(result);
+        return this.createResponse(result.stdout);
       }
 
-      // 一般模式，解析並格式化輸出
-      const formattedResult = this.formatClusterInfo(result);
+      // Normal mode, parse and format output
+      const output = result.stdout;
 
-      this.logSuccess(args, { content: [{ text: formattedResult }] });
-      return this.createResponse(formattedResult);
+      // Parse cluster-info output
+      const lines = output.split('\n').filter(line => line.trim());
+
+      // Extract cluster information
+      const clusterInfo = {};
+      let currentService = null;
+
+      for (const line of lines) {
+        if (line.includes('Kubernetes control plane')) {
+          clusterInfo.controlPlane = this.extractUrl(line);
+        } else if (line.includes('CoreDNS')) {
+          clusterInfo.coreDNS = this.extractUrl(line);
+        } else if (line.includes('running at')) {
+          const serviceName = line.split(' is running at')[0].trim();
+          clusterInfo[serviceName] = this.extractUrl(line);
+        }
+      }
+
+      let formatted = 'Cluster Information\n' + '='.repeat(50) + '\n\n';
+
+      // Control plane information
+      if (clusterInfo.controlPlane) {
+        const url = clusterInfo.controlPlane;
+        formatted += `**Control Plane**\n`;
+        formatted += `   Status: Running\n`;
+        formatted += `   Endpoint: ${url[0]}\n\n`;
+      }
+
+      // CoreDNS information
+      if (clusterInfo.coreDNS) {
+        const url = clusterInfo.coreDNS;
+        formatted += `**CoreDNS Service**\n`;
+        formatted += `   Status: Running\n`;
+        formatted += `   Endpoint: ${url[0]}\n\n`;
+      }
+
+      // Handle other services
+      for (const [service, url] of Object.entries(clusterInfo)) {
+        if (service !== 'controlPlane' && service !== 'coreDNS') {
+          formatted += `**${service}**\n`;
+          formatted += `   Status: Running\n`;
+          formatted += `   Endpoint: ${url[0]}\n\n`;
+        }
+      }
+
+      formatted += `**Debug Tips**\n`;
+      formatted += `   To get detailed cluster information, use: {"dump": true}\n\n`;
+
+      formatted += `**Detailed Information**\n`;
+      formatted += `   Use dump: true parameter to get complete cluster state dump\n\n`;
+
+      // Other important information
+      formatted += `**Command Equivalent**\n`;
+      formatted += `   kubectl cluster-info\n`;
+      if (dump) {
+        formatted += `   kubectl cluster-info dump\n`;
+      }
+
+      return this.createResponse(formatted);
 
     } catch (error) {
-      this.logError(args, error);
-      return this.createErrorResponse(error.message);
+      return this.createErrorResponse(`Failed to get cluster information: ${error.message}`);
     }
   }
 
-  formatClusterInfo(rawOutput) {
-    const lines = rawOutput.split('\n').filter(line => line.trim());
-    let formatted = '叢集資訊\n' + '='.repeat(50) + '\n\n';
-
-    for (const line of lines) {
-      const trimmedLine = line.trim();
-
-      if (trimmedLine.startsWith('Kubernetes control plane')) {
-        formatted += `**控制平面**\n`;
-        const url = trimmedLine.match(/https?:\/\/[^\s]+/);
-        if (url) {
-          formatted += `   端點: ${url[0]}\n\n`;
-        }
-      } else if (trimmedLine.startsWith('CoreDNS')) {
-        formatted += `**CoreDNS**\n`;
-        const url = trimmedLine.match(/https?:\/\/[^\s]+/);
-        if (url) {
-          formatted += `   端點: ${url[0]}\n\n`;
-        }
-      } else if (trimmedLine.includes('is running at')) {
-        // 處理其他服務
-        const serviceName = trimmedLine.split(' is running at')[0];
-        const url = trimmedLine.match(/https?:\/\/[^\s]+/);
-        if (url) {
-          formatted += `**${serviceName}**\n`;
-          formatted += `   端點: ${url[0]}\n\n`;
-        }
-      } else if (trimmedLine.startsWith('To further debug')) {
-        formatted += `**除錯提示**\n`;
-        formatted += `   ${trimmedLine}\n\n`;
-      } else if (trimmedLine.includes('kubectl cluster-info dump')) {
-        formatted += `**詳細資訊**\n`;
-        formatted += `   使用 dump: true 參數取得完整的叢集狀態轉儲\n\n`;
-      } else if (trimmedLine && !trimmedLine.includes('kubectl') && !trimmedLine.includes('cluster-info')) {
-        // 其他重要資訊
-        formatted += `${trimmedLine}\n\n`;
-      }
-    }
-
-    return formatted.trim();
+  extractUrl(line) {
+    const matches = line.match(/https?:\/\/[^\s]+/g);
+    return matches || [];
   }
 }

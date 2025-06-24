@@ -1,6 +1,6 @@
 /**
- * Helm History 工具
- * 查看 Helm release 的部署歷史記錄
+ * Helm History Tool
+ * View deployment history of Helm release
  */
 
 import { BaseTool } from './base-tool.js';
@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 
 export class HelmHistoryTool extends BaseTool {
   constructor() {
-    super('helm_history', '查看 Helm release 的部署歷史記錄');
+    super('helm_history', 'View deployment history of Helm release');
   }
 
   getDefinition() {
@@ -21,22 +21,22 @@ export class HelmHistoryTool extends BaseTool {
         properties: {
           releaseName: {
             type: 'string',
-            description: 'Helm release 名稱（必需）'
+            description: 'Helm release name (required)'
           },
           namespace: {
             type: 'string',
-            description: 'Kubernetes 命名空間（可選）'
+            description: 'Kubernetes namespace (optional)'
           },
           max: {
             type: 'integer',
-            description: '顯示的歷史記錄數量上限（預設：256）',
+            description: 'Maximum number of history records to display (default: 256)',
             minimum: 1,
             maximum: 1000,
             default: 256
           },
           output: {
             type: 'string',
-            description: '輸出格式（預設：table）',
+            description: 'Output format (default: table)',
             enum: ['table', 'json', 'yaml'],
             default: 'table'
           }
@@ -57,12 +57,12 @@ export class HelmHistoryTool extends BaseTool {
         output = 'table'
       } = args;
 
-      // 驗證 release 名稱
+      // Validate release name
       if (!releaseName || releaseName.trim() === '') {
-        throw new Error('releaseName 參數不能為空');
+        throw new Error('releaseName parameter cannot be empty');
       }
 
-      // 建構 helm history 指令
+      // Build helm history command
       const command = this.buildHelmHistoryCommand({
         releaseName: releaseName.trim(),
         namespace,
@@ -70,16 +70,16 @@ export class HelmHistoryTool extends BaseTool {
         output
       });
 
-      // 記錄調試信息
-      logger.debug(`HelmHistoryTool 執行參數:`, {
-        原始參數: args,
-        最終命令: `helm ${command.join(' ')}`
+      // Log debug information
+      logger.debug(`HelmHistoryTool execution parameters:`, {
+        originalParameters: args,
+        finalCommand: `helm ${command.join(' ')}`
       });
 
-      // 執行指令
+      // Execute command
       const helmOutput = await helm.execute(command);
 
-      // 格式化輸出
+      // Format output
       const formattedOutput = this.formatHistoryOutput(helmOutput, args);
 
       this.logSuccess(args, { content: [{ text: formattedOutput }] });
@@ -96,17 +96,17 @@ export class HelmHistoryTool extends BaseTool {
 
     let command = ['history', releaseName];
 
-    // 命名空間參數
+    // Namespace parameter
     if (namespace && namespace.trim() !== '') {
       command.push('--namespace', namespace.trim());
     }
 
-    // 最大數量限制
+    // Maximum count limit
     if (max && max !== 256) {
       command.push('--max', max.toString());
     }
 
-    // 輸出格式
+    // Output format
     if (output && output !== 'table') {
       command.push('--output', output);
     }
@@ -121,13 +121,13 @@ export class HelmHistoryTool extends BaseTool {
       return this.formatEmptyResult(args);
     }
 
-    // 如果是 JSON 或 YAML 格式，直接返回原始輸出
+    // If it's JSON or YAML format, return original output directly
     if (outputFormat === 'json' || outputFormat === 'yaml') {
       const header = this.buildOutputHeader(args);
       return `${header}\n\n${output}`;
     }
 
-    // 處理 table 格式輸出
+    // Process table format output
     return this.formatTableOutput(output, args);
   }
 
@@ -139,10 +139,10 @@ export class HelmHistoryTool extends BaseTool {
       return this.formatEmptyResult(args);
     }
 
-    // 建構輸出標題
+    // Build output header
     const header = this.buildOutputHeader(args);
 
-    // 處理表格內容
+    // Process table content
     let formattedLines = [];
     let revisionCount = 0;
 
@@ -151,40 +151,40 @@ export class HelmHistoryTool extends BaseTool {
 
       if (line === '') continue;
 
-      // 如果是標題行
+      // If it's a header line
       if (line.includes('REVISION') && line.includes('UPDATED')) {
         formattedLines.push('');
-        formattedLines.push(`歷史記錄詳情：`);
-        formattedLines.push('=' * 50);
+        formattedLines.push(`History details:`);
+        formattedLines.push('='.repeat(50));
         formattedLines.push('');
         formattedLines.push(line);
         formattedLines.push('-'.repeat(line.length));
       } else if (line.match(/^\d+/)) {
-        // 這是一個歷史記錄行
+        // This is a history record line
         revisionCount++;
         formattedLines.push(line);
       }
     }
 
-    // 建構最終輸出
+    // Build final output
     let result = header;
 
     if (revisionCount > 0) {
-      result += `\n\n找到 ${revisionCount} 個歷史記錄：`;
+      result += `\n\nFound ${revisionCount} history records:`;
       result += formattedLines.join('\n');
 
-      result += '\n\n說明：';
-      result += '\n• REVISION：版本號碼（數字越大表示越新）';
-      result += '\n• UPDATED：部署或更新時間';
-      result += '\n• STATUS：部署狀態（deployed=已部署，failed=失敗，superseded=被取代等）';
-      result += '\n• CHART：使用的 Chart 版本';
-      result += '\n• APP VERSION：應用程式版本';
-      result += '\n• DESCRIPTION：部署描述或變更說明';
+      result += '\n\nExplanation:';
+      result += '\n• REVISION: Version number (higher numbers indicate newer versions)';
+      result += '\n• UPDATED: Deployment or update time';
+      result += '\n• STATUS: Deployment status (deployed=deployed, failed=failed, superseded=superseded, etc.)';
+      result += '\n• CHART: Used Chart version';
+      result += '\n• APP VERSION: Application version';
+      result += '\n• DESCRIPTION: Deployment description or change notes';
 
-      result += '\n\n提示：';
-      result += `\n• 使用 helm_status 查看當前 release 詳細資訊`;
-      result += `\n• 使用 helm_get_values 查看指定版本的配置值`;
-      result += `\n• 最新版本是 revision ${revisionCount}`;
+      result += '\n\nTips:';
+      result += `\n• Use helm_status to view current release detailed information`;
+      result += `\n• Use helm_get_values to view configuration values for specified version`;
+      result += `\n• Latest version is revision ${revisionCount}`;
     } else {
       result += '\n\n' + this.formatEmptyResult(args).split('\n').slice(2).join('\n');
     }
@@ -195,22 +195,17 @@ export class HelmHistoryTool extends BaseTool {
   buildOutputHeader(args) {
     const { releaseName, namespace, max, output } = args;
 
-    let header = `Helm Release 歷史記錄`;
+    let header = `Helm Release History`;
     header += '\n' + '='.repeat(50);
-    header += `\n\n• Release 名稱：${releaseName}`;
-
+    header += `\n\n• Release name: ${releaseName}`;
     if (namespace) {
-      header += `\n• 命名空間：${namespace}`;
-    } else {
-      header += `\n• 命名空間：（當前命名空間）`;
+      header += `\n• Namespace: ${namespace}`;
     }
-
     if (max && max !== 256) {
-      header += `\n• 最大記錄數：${max}`;
+      header += `\n• Maximum records: ${max}`;
     }
-
     if (output && output !== 'table') {
-      header += `\n• 輸出格式：${output}`;
+      header += `\n• Output format: ${output.toUpperCase()}`;
     }
 
     return header;
@@ -220,18 +215,18 @@ export class HelmHistoryTool extends BaseTool {
     const { releaseName, namespace } = args;
 
     let result = this.buildOutputHeader(args);
-    result += `\n\n沒有找到 release "${releaseName}" 的歷史記錄。`;
-    result += '\n\n可能的原因：';
-    result += `\n• Release "${releaseName}" 不存在`;
-    result += '\n• 指定的命名空間不正確';
-    result += '\n• 沒有部署歷史記錄';
+    result += `\n\nNo history records found for release "${releaseName}".`;
+    result += '\n\nPossible reasons:';
+    result += `\n• Release "${releaseName}" does not exist`;
+    result += '\n• Specified namespace is incorrect';
+    result += '\n• No deployment history records';
 
-    result += '\n\n建議檢查：';
-    result += '\n• 使用 helm_list 確認 release 名稱';
+    result += '\n\nSuggestions:';
+    result += '\n• Use helm_list to confirm release name';
     if (namespace) {
-      result += `\n• 確認命名空間 "${namespace}" 是否正確`;
+      result += `\n• Verify namespace "${namespace}" is correct`;
     } else {
-      result += '\n• 嘗試指定正確的命名空間';
+      result += '\n• Try specifying the correct namespace';
     }
 
     return result;

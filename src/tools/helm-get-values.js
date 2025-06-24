@@ -1,6 +1,6 @@
 /**
- * Helm Get Values 工具
- * 查看 Helm release 的配置值
+ * Helm Get Values Tool
+ * View configuration values of Helm release
  */
 
 import { BaseTool } from './base-tool.js';
@@ -8,7 +8,7 @@ import { helm } from '../utils/helm.js';
 
 export class HelmGetValuesTool extends BaseTool {
   constructor() {
-    super('helm_get_values', '查看 Helm release 的配置值');
+    super('helm_get_values', 'View configuration values of Helm release');
   }
 
   getDefinition() {
@@ -20,26 +20,26 @@ export class HelmGetValuesTool extends BaseTool {
         properties: {
           releaseName: {
             type: 'string',
-            description: 'Helm release 名稱'
+            description: 'Helm release name'
           },
           namespace: {
             type: 'string',
-            description: 'Kubernetes 命名空間（可選）'
+            description: 'Kubernetes namespace (optional)'
           },
           revision: {
             type: 'integer',
-            description: '指定修訂版本號（可選，預設為最新版本）',
+            description: 'Specify revision number (optional, defaults to latest version)',
             minimum: 1
           },
           output: {
             type: 'string',
-            description: '輸出格式',
+            description: 'Output format',
             enum: ['yaml', 'json', 'table'],
             default: 'yaml'
           },
           allValues: {
             type: 'boolean',
-            description: '顯示所有值，包括預設值（預設：false）',
+            description: 'Show all values including default values (default: false)',
             default: false
           }
         },
@@ -60,7 +60,7 @@ export class HelmGetValuesTool extends BaseTool {
         allValues = false
       } = args;
 
-      // 建構 helm get values 指令
+      // Build helm get values command
       const command = this.buildHelmGetValuesCommand({
         releaseName,
         namespace,
@@ -69,10 +69,10 @@ export class HelmGetValuesTool extends BaseTool {
         allValues
       });
 
-      // 執行指令
+      // Execute command
       const result = await helm.execute(command);
 
-      // 格式化輸出
+      // Format output
       const formattedOutput = this.formatValuesOutput(result, args);
 
       this.logSuccess(args, { content: [{ text: formattedOutput }] });
@@ -95,22 +95,22 @@ export class HelmGetValuesTool extends BaseTool {
 
     let command = ['get', 'values', releaseName];
 
-    // 命名空間參數
+    // Namespace parameter
     if (namespace) {
       command.push('--namespace', namespace);
     }
 
-    // 修訂版本
+    // Revision
     if (revision) {
       command.push('--revision', revision.toString());
     }
 
-    // 輸出格式
+    // Output format
     if (output !== 'yaml') {
       command.push('--output', output);
     }
 
-    // 顯示所有值
+    // Show all values
     if (allValues) {
       command.push('--all');
     }
@@ -121,44 +121,44 @@ export class HelmGetValuesTool extends BaseTool {
   formatValuesOutput(output, args) {
     const { releaseName, namespace, revision, output: format, allValues } = args;
 
-    let result = `Helm Release 配置值\n`;
+    let result = `Helm Release Configuration Values\n`;
     result += `==================================================\n\n`;
 
-    result += `**Release 資訊:**\n`;
-    result += `• 名稱: ${releaseName}\n`;
+    result += `**Release Information:**\n`;
+    result += `• Name: ${releaseName}\n`;
     if (namespace) {
-      result += `• 命名空間: ${namespace}\n`;
+      result += `• Namespace: ${namespace}\n`;
     }
     if (revision) {
-      result += `• 修訂版本: ${revision}\n`;
+      result += `• Revision: ${revision}\n`;
     }
-    result += `• 輸出格式: ${format.toUpperCase()}\n`;
-    result += `• 範圍: ${allValues ? '所有值（包括預設值）' : '僅自定義值'}\n`;
+    result += `• Output format: ${format.toUpperCase()}\n`;
+    result += `• Scope: ${allValues ? 'All values (including default values)' : 'Custom values only'}\n`;
     result += `\n`;
 
     if (!output.trim()) {
-      result += `**配置值:**\n`;
+      result += `**Configuration values:**\n`;
       if (allValues) {
-        result += `沒有找到任何配置值（包括預設值）。\n\n`;
+        result += `No configuration values found (including default values).\n\n`;
       } else {
-        result += `沒有自定義配置值。此 release 使用 Chart 的預設值。\n\n`;
-        result += `提示: 使用 allValues=true 參數查看所有值（包括預設值）。\n\n`;
+        result += `No custom configuration values. This release uses Chart default values.\n\n`;
+        result += `Tip: Use allValues=true parameter to view all values (including default values).\n\n`;
       }
     } else {
-      result += `**配置值:**\n\n`;
+      result += `**Configuration values:**\n\n`;
       result += `\`\`\`${format}\n`;
       result += output;
       result += `\n\`\`\`\n\n`;
     }
 
-    result += `**相關操作提示:**\n`;
-    result += `• 使用 helm_status 查看 release 狀態\n`;
-    result += `• 使用 helm_get_manifest 查看生成的 Kubernetes 資源\n`;
-    result += `• 使用 helm_upgrade 更新 release 配置\n`;
-    result += `• 使用 helm_history 查看配置變更歷史\n`;
+    result += `**Related Operation Tips:**\n`;
+    result += `• Use helm_status to view release status\n`;
+    result += `• Use helm_get_manifest to view generated Kubernetes resources\n`;
+    result += `• Use helm_upgrade to update release configuration\n`;
+    result += `• Use helm_history to view configuration change history\n`;
 
     if (!allValues) {
-      result += `• 使用 allValues=true 查看所有值（包括預設值）\n`;
+      result += `• Use allValues=true to view all values (including default values)\n`;
     }
 
     return result;
@@ -168,33 +168,33 @@ export class HelmGetValuesTool extends BaseTool {
     const { releaseName, namespace } = args;
 
     if (errorMessage.includes('not found')) {
-      let result = `Release "${releaseName}" 不存在。\n\n`;
+      let result = `Release "${releaseName}" does not exist.\n\n`;
 
       if (namespace) {
-        result += `在命名空間 "${namespace}" 中找不到該 release。\n\n`;
+        result += `Cannot find this release in namespace "${namespace}".\n\n`;
       }
 
-      result += `可能的原因：\n`;
-      result += `• Release 名稱拼寫錯誤\n`;
-      result += `• Release 在不同的命名空間中\n`;
-      result += `• Release 已被卸載\n\n`;
+      result += `Possible reasons:\n`;
+      result += `• Release name is misspelled\n`;
+      result += `• Release is in a different namespace\n`;
+      result += `• Release has been uninstalled\n\n`;
 
-      result += `建議操作：\n`;
-      result += `• 使用 helm_list 查看所有可用的 releases\n`;
-      result += `• 使用 helm_list 並設定 allNamespaces=true 跨命名空間搜尋\n`;
-      result += `• 檢查 release 名稱是否正確\n`;
+      result += `Suggested actions:\n`;
+      result += `• Use helm_list to view all available releases\n`;
+      result += `• Use helm_list and set allNamespaces=true to search across namespaces\n`;
+      result += `• Check if the release name is correct\n`;
 
       return result;
     }
 
     if (errorMessage.includes('revision')) {
-      let result = `指定的修訂版本不存在。\n\n`;
-      result += `錯誤訊息: ${errorMessage}\n\n`;
+      let result = `Specified revision does not exist.\n\n`;
+      result += `Error message: ${errorMessage}\n\n`;
 
-      result += `建議操作：\n`;
-      result += `• 使用 helm_history 查看可用的修訂版本\n`;
-      result += `• 不指定 revision 參數以查看最新版本\n`;
-      result += `• 檢查修訂版本號是否正確\n`;
+      result += `Suggested actions:\n`;
+      result += `• Use helm_history to view available revisions\n`;
+      result += `• Don't specify revision parameter to view latest version\n`;
+      result += `• Check if the revision number is correct\n`;
 
       return result;
     }

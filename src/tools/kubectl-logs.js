@@ -3,7 +3,7 @@ import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlLogsTool extends BaseTool {
   constructor() {
-    super('kubectl_logs', '取得 Pod 日誌');
+    super('kubectl_logs', 'Get Pod logs');
   }
 
   getDefinition() {
@@ -15,36 +15,36 @@ export class KubectlLogsTool extends BaseTool {
         properties: {
           pod: {
             type: 'string',
-            description: 'Pod 名稱 (必填)',
+            description: 'Pod name (required)',
           },
           namespace: {
             type: 'string',
-            description: '命名空間 (預設為 default)',
+            description: 'Namespace (defaults to default)',
             default: 'default',
           },
           container: {
             type: 'string',
-            description: '容器名稱 (多容器 Pod 時需要指定)',
+            description: 'Container name (required for multi-container Pods)',
           },
           lines: {
             type: 'integer',
-            description: '顯示最後 N 行日誌 (預設 100，最大 1000)',
+            description: 'Show last N lines of logs (default 100, max 1000)',
             minimum: 1,
             maximum: 1000,
             default: 100,
           },
           since: {
             type: 'string',
-            description: '顯示指定時間之後的日誌 (例如: 1h, 30m, 10s)',
+            description: 'Show logs after specified time (e.g.: 1h, 30m, 10s)',
           },
           follow: {
             type: 'boolean',
-            description: '是否持續追蹤日誌 (預設 false，因安全考量)',
+            description: 'Whether to continuously follow logs (default false, disabled for security)',
             default: false,
           },
           previous: {
             type: 'boolean',
-            description: '是否顯示前一個容器實例的日誌 (預設 false)',
+            description: 'Whether to show logs from previous container instance (default false)',
             default: false,
           },
         },
@@ -67,48 +67,48 @@ export class KubectlLogsTool extends BaseTool {
         previous = false
       } = args;
 
-      // 安全限制：不允許 follow 模式，避免長時間運行
+      // Security restriction: don't allow follow mode to avoid long-running processes
       if (follow) {
-        throw new Error('基於安全考量，不支援 follow 模式');
+        throw new Error('Follow mode is disabled for security reasons');
       }
 
-      // 限制行數
+      // Limit lines
       const maxLines = Math.min(Math.max(1, lines), 1000);
 
-      // 建構 kubectl logs 指令
+      // Build kubectl logs command
       const kubectlArgs = ['logs', pod];
 
-      // 添加 namespace
+      // Add namespace
       if (namespace && namespace !== 'default') {
         kubectlArgs.push('-n', namespace);
       }
 
-      // 添加容器名稱
+      // Add container name
       if (container) {
         kubectlArgs.push('-c', container);
       }
 
-      // 添加行數限制
+      // Add line limit
       kubectlArgs.push('--tail', maxLines.toString());
 
-      // 添加時間限制
+      // Add time limit
       if (since) {
-        // 驗證時間格式 (簡單驗證)
+        // Validate time format (simple validation)
         if (!/^\d+[smhd]$/.test(since)) {
-          throw new Error('時間格式錯誤，應為數字加單位 (s/m/h/d)，例如: 30m, 1h, 2d');
+          throw new Error('Invalid time format, should be number with unit (s/m/h/d), e.g.: 30m, 1h, 2d');
         }
         kubectlArgs.push('--since', since);
       }
 
-      // 添加 previous 選項
+      // Add previous option
       if (previous) {
         kubectlArgs.push('--previous');
       }
 
-      // 執行指令
+      // Execute command
       const result = await kubectl.execute(kubectlArgs);
 
-      // 格式化回應
+      // Format response
       const logInfo = {
         pod: pod,
         namespace: namespace,
@@ -122,16 +122,16 @@ export class KubectlLogsTool extends BaseTool {
 
       this.logSuccess(args, { content: [{ text: result }] });
 
-      // 回傳結構化的回應
+      // Return structured response
       return {
         content: [
           {
             type: 'text',
             text: `Pod: ${pod} (namespace: ${namespace})${container ? `, container: ${container}` : ''}
-行數: ${maxLines}${since ? `, 時間範圍: ${since}` : ''}${previous ? ', 前一個實例' : ''}
-日誌長度: ${result.length} 字元
+Lines: ${maxLines}${since ? `, time range: ${since}` : ''}${previous ? ', previous instance' : ''}
+Log length: ${result.length} characters
 
-=== 日誌內容 ===
+=== Log Content ===
 ${result}`,
           },
         ],
