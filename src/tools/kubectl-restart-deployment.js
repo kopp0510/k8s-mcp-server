@@ -4,7 +4,7 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { KubernetesCommandRunner } from '../utils/command-runner.js';
+import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlRestartDeploymentTool extends BaseTool {
   constructor() {
@@ -51,22 +51,20 @@ export class KubectlRestartDeploymentTool extends BaseTool {
         timeout = 300
       } = args;
 
-      const runner = new KubernetesCommandRunner();
-
       // Check if Deployment exists and get current state
-      const beforeState = await this.getDeploymentState(deploymentName, namespace, runner);
+      const beforeState = await this.getDeploymentState(deploymentName, namespace);
 
       // Execute restart operation
-      await this.restartDeployment(deploymentName, namespace, runner);
+      await this.restartDeployment(deploymentName, namespace);
 
       // If wait is required, wait for restart to complete
       let afterState;
       if (wait) {
-        afterState = await this.waitForRestartComplete(deploymentName, namespace, timeout, beforeState.generation, runner);
+        afterState = await this.waitForRestartComplete(deploymentName, namespace, timeout, beforeState.generation);
       } else {
         // Brief wait then get state
         await this.sleep(3000);
-        afterState = await this.getDeploymentState(deploymentName, namespace, runner);
+        afterState = await this.getDeploymentState(deploymentName, namespace);
       }
 
       // Format final result
@@ -79,12 +77,12 @@ export class KubectlRestartDeploymentTool extends BaseTool {
     }
   }
 
-  async getDeploymentState(deploymentName, namespace, runner) {
+  async getDeploymentState(deploymentName, namespace) {
     try {
       const command = ['get', 'deployment', deploymentName, '-n', namespace, '-o', 'json'];
-      const result = await runner.run('kubectl', command);
+      const result = await kubectl.execute(command);
 
-      const deployment = JSON.parse(result.stdout);
+      const deployment = JSON.parse(result);
 
       return {
         name: deployment.metadata.name,
@@ -107,16 +105,16 @@ export class KubectlRestartDeploymentTool extends BaseTool {
     }
   }
 
-  async restartDeployment(deploymentName, namespace, runner) {
+  async restartDeployment(deploymentName, namespace) {
     try {
       const command = ['rollout', 'restart', 'deployment', deploymentName, '-n', namespace];
-      await runner.run('kubectl', command);
+      await kubectl.execute(command);
     } catch (error) {
       throw new Error(`Failed to restart Deployment: ${error.message}`);
     }
   }
 
-  async waitForRestartComplete(deploymentName, namespace, timeout, originalGeneration, runner) {
+  async waitForRestartComplete(deploymentName, namespace, timeout, originalGeneration) {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
 

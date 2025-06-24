@@ -4,7 +4,7 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { KubernetesCommandRunner } from '../utils/command-runner.js';
+import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlScaleDeploymentTool extends BaseTool {
   constructor() {
@@ -58,22 +58,20 @@ export class KubectlScaleDeploymentTool extends BaseTool {
         timeout = 300
       } = args;
 
-      const runner = new KubernetesCommandRunner();
-
       // Check if Deployment exists and get current state
-      const currentState = await this.getDeploymentState(deploymentName, namespace, runner);
+      const currentState = await this.getDeploymentState(deploymentName, namespace);
 
       // Execute scaling operation
-      await this.scaleDeployment(deploymentName, replicas, namespace, runner);
+      await this.scaleDeployment(deploymentName, replicas, namespace);
 
       // If wait is required, wait for scaling to complete
       let afterState;
       if (wait) {
-        afterState = await this.waitForScaleComplete(deploymentName, replicas, namespace, timeout, runner);
+        afterState = await this.waitForScaleComplete(deploymentName, replicas, namespace, timeout);
       } else {
         // Brief wait then get state
         await this.sleep(2000);
-        afterState = await this.getDeploymentState(deploymentName, namespace, runner);
+        afterState = await this.getDeploymentState(deploymentName, namespace);
       }
 
       // Format final result
@@ -86,12 +84,12 @@ export class KubectlScaleDeploymentTool extends BaseTool {
     }
   }
 
-  async getDeploymentState(deploymentName, namespace, runner) {
+  async getDeploymentState(deploymentName, namespace) {
     try {
       const command = ['get', 'deployment', deploymentName, '-n', namespace, '-o', 'json'];
-      const result = await runner.run('kubectl', command);
+      const result = await kubectl.execute(command);
 
-      const deployment = JSON.parse(result.stdout);
+      const deployment = JSON.parse(result);
 
       return {
         name: deployment.metadata.name,
@@ -111,22 +109,22 @@ export class KubectlScaleDeploymentTool extends BaseTool {
     }
   }
 
-  async scaleDeployment(deploymentName, replicas, namespace, runner) {
+  async scaleDeployment(deploymentName, replicas, namespace) {
     try {
       const command = ['scale', 'deployment', deploymentName, '--replicas', replicas.toString(), '-n', namespace];
-      await runner.run('kubectl', command);
+      await kubectl.execute(command);
     } catch (error) {
       throw new Error(`Failed to scale Deployment: ${error.message}`);
     }
   }
 
-  async waitForScaleComplete(deploymentName, targetReplicas, namespace, timeout, runner) {
+  async waitForScaleComplete(deploymentName, targetReplicas, namespace, timeout) {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const state = await this.getDeploymentState(deploymentName, namespace, runner);
+        const state = await this.getDeploymentState(deploymentName, namespace);
 
         // Check if target state is reached
         if (targetReplicas === 0) {
@@ -150,7 +148,7 @@ export class KubectlScaleDeploymentTool extends BaseTool {
     }
 
     // Timeout, get final state
-    const finalState = await this.getDeploymentState(deploymentName, namespace, runner);
+    const finalState = await this.getDeploymentState(deploymentName, namespace);
     finalState.timeout = true;
     return finalState;
   }

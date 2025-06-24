@@ -3,7 +3,7 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { KubernetesCommandRunner } from '../utils/command-runner.js';
+import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlGetYamlTool extends BaseTool {
   constructor() {
@@ -48,7 +48,6 @@ export class KubectlGetYamlTool extends BaseTool {
   async execute(args) {
     try {
       const { resource, name, namespace, allNamespaces } = args;
-      const runner = new KubernetesCommandRunner();
 
       // Validate parameter combination
       this.validateParameterCombination(resource, namespace, allNamespaces);
@@ -57,9 +56,9 @@ export class KubectlGetYamlTool extends BaseTool {
       const command = this.buildKubectlCommand(resource, name, namespace, allNamespaces);
 
       // Execute command
-      const result = await runner.run('kubectl', command);
+      const result = await kubectl.execute(command);
 
-      return this.createResponse(result.stdout);
+      return this.createResponse(result);
 
     } catch (error) {
       return this.createErrorResponse(error.message);

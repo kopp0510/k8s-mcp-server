@@ -4,7 +4,7 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { KubernetesCommandRunner } from '../utils/command-runner.js';
+import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlTopPodsTool extends BaseTool {
   constructor() {
@@ -44,22 +44,21 @@ export class KubectlTopPodsTool extends BaseTool {
   async execute(args) {
     try {
       const { namespace = 'default', allNamespaces, sortBy, containers } = args;
-      const runner = new KubernetesCommandRunner();
 
       // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
 
       // Check if metrics-server is installed and running
-      await this.checkMetricsServer(runner);
+      await this.checkMetricsServer();
 
       // Build kubectl top pods command
       const command = this.buildTopCommand(namespace, allNamespaces, sortBy, containers);
 
       // Execute command
-      const result = await runner.run('kubectl', command);
+      const result = await kubectl.execute(command);
 
       // Format output
-      const formattedResult = this.formatTopOutput(result.stdout, allNamespaces, containers);
+      const formattedResult = this.formatTopOutput(result, allNamespaces, containers);
 
       return this.createResponse(formattedResult);
 
@@ -80,13 +79,13 @@ export class KubectlTopPodsTool extends BaseTool {
     }
   }
 
-  async checkMetricsServer(runner) {
+  async checkMetricsServer() {
     try {
       // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await runner.run('kubectl', checkCommand);
+      const result = await kubectl.execute(checkCommand);
 
-      const deployment = JSON.parse(result.stdout);
+      const deployment = JSON.parse(result);
 
       // Check deployment status
       const status = deployment.status;

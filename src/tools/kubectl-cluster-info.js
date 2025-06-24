@@ -4,7 +4,7 @@
  */
 
 import { BaseTool } from './base-tool.js';
-import { KubernetesCommandRunner } from '../utils/command-runner.js';
+import { kubectl } from '../utils/kubectl.js';
 
 export class KubectlClusterInfoTool extends BaseTool {
   constructor() {
@@ -32,7 +32,6 @@ export class KubectlClusterInfoTool extends BaseTool {
   async execute(args) {
     try {
       const { dump = false } = args;
-      const runner = new KubernetesCommandRunner();
 
       // Build kubectl command
       const cmdArgs = ['cluster-info'];
@@ -41,15 +40,15 @@ export class KubectlClusterInfoTool extends BaseTool {
       }
 
       // Execute command
-      const result = await runner.run('kubectl', cmdArgs);
+      const result = await kubectl.execute(cmdArgs);
 
       // If dump mode, return raw output directly
       if (dump) {
-        return this.createResponse(result.stdout);
+        return this.createResponse(result);
       }
 
       // Normal mode, parse and format output
-      const output = result.stdout;
+      const output = result;
 
       // Parse cluster-info output
       const lines = output.split('\n').filter(line => line.trim());
