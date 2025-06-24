@@ -1,66 +1,73 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { logger } from './logger.js';
 
-const execAsync = promisify(exec);
-
-class SimpleHelm {
+export class HelmRunner {
   constructor() {
-    this.timeout = 60000; // 60 秒超時（Helm 操作通常比 kubectl 慢）
+    this.timeout = 60000; // 60 second timeout (Helm operations usually slower than kubectl)
   }
 
   async execute(args) {
-    // 驗證參數
+    // Validate parameters
     if (!Array.isArray(args) || args.length === 0) {
-      throw new Error('helm 參數必須是非空陣列');
+      throw new Error('helm arguments must be a non-empty array');
     }
 
-    // 建構指令
-    const command = ['helm', ...args].join(' ');
+    // Build command
+    const command = `helm ${args.join(' ')}`;
 
-    logger.debug(`執行 helm: ${command}`);
+    logger.debug(`Executing helm: ${command}`);
 
-    try {
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: this.timeout,
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+    return new Promise((resolve, reject) => {
+      const helm = spawn('helm', args, {
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
-      if (stderr && !stdout) {
-        throw new Error(stderr);
-      }
+      let stdout = '';
+      let stderr = '';
 
-      if (stderr) {
-        logger.warn(`helm 警告: ${stderr}`);
-      }
+      helm.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
-      return stdout;
+      helm.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-    } catch (error) {
-      logger.error(`helm 執行失敗: ${command}`, error);
+      helm.on('close', (code) => {
+        if (stderr && !stdout) {
+          logger.warn(`helm warning: ${stderr}`);
+        }
 
-      // 處理常見錯誤
-      if (error.code === 'ETIMEDOUT') {
-        throw new Error('helm 指令執行超時');
-      }
+        if (code === 0) {
+          resolve(stdout.trim());
+        } else {
+          logger.error(`helm execution failed: ${command}`, { code, stderr });
 
-      if (error.stderr) {
-        throw new Error(error.stderr);
-      }
+          // Handle common errors
+          if (stderr.includes('timeout')) {
+            reject(new Error('helm command execution timeout'));
+          } else if (stderr.includes('not found')) {
+            reject(new Error(`Resource not found: ${stderr.trim()}`));
+          } else if (stderr.includes('connection refused')) {
+            reject(new Error(`Unable to connect to cluster: ${stderr.trim()}`));
+          } else {
+            reject(new Error(`helm execution failed: ${stderr.trim() || `Exit code: ${code}`}`));
+          }
+        }
+      });
 
-      throw new Error(`helm 執行失敗: ${error.message}`);
-    }
-  }
+      helm.on('error', (error) => {
+        logger.error(`helm execution failed: ${command}`, error);
+        reject(new Error(`helm execution failed: ${error.message}`));
+      });
 
-  async executeWithTimeout(args, timeoutMs) {
-    const originalTimeout = this.timeout;
-    this.timeout = timeoutMs;
-    try {
-      return await this.execute(args);
-    } finally {
-      this.timeout = originalTimeout;
-    }
+      // Set timeout
+      setTimeout(() => {
+        helm.kill('SIGTERM');
+        reject(new Error('helm command timeout'));
+      }, this.timeout);
+    });
   }
 }
 
-export const helm = new SimpleHelm();
+export const helm = new HelmRunner();

@@ -1,67 +1,80 @@
 import { validator } from '../utils/validator.js';
 import { logger } from '../utils/logger.js';
 
+/**
+ * Base tool class
+ * Provides common functionality for all MCP tools
+ */
 export class BaseTool {
   constructor(name, description) {
     this.name = name;
     this.description = description;
   }
 
-  // 子類別必須實作
+  // Subclasses must implement
   getDefinition() {
-    throw new Error('子類別必須實作 getDefinition 方法');
+    throw new Error('Subclasses must implement getDefinition method');
   }
 
   async execute(args) {
-    throw new Error('子類別必須實作 execute 方法');
+    throw new Error('Subclasses must implement execute method');
   }
 
-  // 通用驗證
-  validateInput(args) {
-    const definition = this.getDefinition();
-    validator.validateInput(args, definition.inputSchema);
+  // Common validation
+  validateArgs(args, schema) {
+    // Can add more detailed validation logic here
+    return true;
   }
 
-  // 統一回應格式
-  createResponse(text) {
+  // Unified response format
+  createResponse(content, isError = false) {
+    if (isError) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: content
+          }
+        ],
+        isError: true
+      };
+    }
+
     return {
       content: [
         {
-          type: 'text',
-          text: text,
-        },
-      ],
+          type: "text",
+          text: content
+        }
+      ]
     };
-  }
-
-  createJsonResponse(data) {
-    return this.createResponse(JSON.stringify(data, null, 2));
   }
 
   createErrorResponse(message) {
     return {
-      isError: true,
       content: [
         {
-          type: 'text',
-          text: `錯誤: ${message}`,
-        },
+          type: "text",
+          text: `Error: ${message}`,
+        }
       ],
+      isError: true
     };
   }
 
-  // 日誌
-  logSuccess(args, result) {
-    logger.info(`工具 ${this.name} 執行成功`, {
-      args,
+  // Logging
+  logSuccess(result) {
+    logger.info(`Tool ${this.name} executed successfully`, {
+      tool: this.name,
       resultLength: result?.content?.[0]?.text?.length || 0
     });
   }
 
-  logError(args, error) {
-    logger.error(`工具 ${this.name} 執行失敗`, {
-      args,
-      error: error.message
+  logError(error, args) {
+    logger.error(`Tool ${this.name} execution failed`, {
+      tool: this.name,
+      error: error.message,
+      args
     });
   }
 }

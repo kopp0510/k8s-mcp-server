@@ -1,6 +1,6 @@
 /**
- * Helm List 工具
- * 列出 Helm releases
+ * Helm List Tool
+ * List Helm releases
  */
 
 import { BaseTool } from './base-tool.js';
@@ -9,7 +9,7 @@ import { logger } from '../utils/logger.js';
 
 export class HelmListTool extends BaseTool {
   constructor() {
-    super('helm_list', '列出 Helm releases，支援多種篩選選項（包含 -A 參數）');
+    super('helm_list', 'List Helm releases with various filtering options (including -A parameter)');
   }
 
   getDefinition() {
@@ -21,40 +21,40 @@ export class HelmListTool extends BaseTool {
         properties: {
           namespace: {
             type: 'string',
-            description: 'Kubernetes 命名空間（可選，預設為所有命名空間）'
+            description: 'Kubernetes namespace (optional, defaults to all namespaces)'
           },
           allNamespaces: {
             type: 'boolean',
-            description: '顯示所有命名空間的 releases，等同於 helm ls -A（預設：true）',
+            description: 'Show releases across all namespaces, equivalent to helm ls -A (default: true)',
             default: true
           },
           status: {
             type: 'string',
-            description: '按狀態篩選 releases（可選）：all=所有狀態，deployed=已部署（預設），failed=失敗，uninstalled=已卸載，superseded=被取代，pending=待處理',
+            description: 'Filter releases by status (optional): all=all status, deployed=deployed (default), failed=failed, uninstalled=uninstalled, superseded=superseded, pending=pending',
             enum: ['all', 'deployed', 'failed', 'uninstalled', 'superseded', 'pending']
           },
           filter: {
             type: 'string',
-            description: 'Release 名稱篩選器（支援正則表達式）'
+            description: 'Release name filter (supports regular expressions)'
           },
           short: {
             type: 'boolean',
-            description: '使用簡短輸出格式（預設：false）',
+            description: 'Use short output format (default: false)',
             default: false
           },
           date: {
             type: 'boolean',
-            description: '包含上次部署時間（預設：true）',
+            description: 'Include last deployment time (default: true)',
             default: true
           },
           reverse: {
             type: 'boolean',
-            description: '反向排序結果（預設：false）',
+            description: 'Reverse sort results (default: false)',
             default: false
           },
           max: {
             type: 'integer',
-            description: '最大結果數量（預設：256）',
+            description: 'Maximum number of results (default: 256)',
             minimum: 1,
             maximum: 1000,
             default: 256
@@ -80,15 +80,15 @@ export class HelmListTool extends BaseTool {
         max = 256
       } = args;
 
-      // 驗證參數組合 - 只有在明確設置 allNamespaces 時才檢查衝突
+      // Validate parameter combination - only check conflicts when allNamespaces is explicitly set
       if (namespace && args.allNamespaces === true) {
-        throw new Error('namespace 和 allNamespaces 參數不能同時使用');
+        throw new Error('namespace and allNamespaces parameters cannot be used together');
       }
 
-      // 如果指定了 namespace，則不使用 allNamespaces
+      // If namespace is specified, don't use allNamespaces
       const effectiveAllNamespaces = namespace ? false : allNamespaces;
 
-      // 建構 helm list 指令
+      // Build helm list command
       const commandOptions = {
         namespace,
         allNamespaces: effectiveAllNamespaces,
@@ -102,17 +102,17 @@ export class HelmListTool extends BaseTool {
 
       const command = this.buildHelmListCommand(commandOptions);
 
-      // 記錄調試信息
-      logger.debug(`HelmListTool 執行參數:`, {
-        原始參數: args,
-        處理後參數: commandOptions,
-        最終命令: `helm ${command.join(' ')}`
+      // Log debug information
+      logger.debug(`HelmListTool execution parameters:`, {
+        originalParameters: args,
+        processedParameters: commandOptions,
+        finalCommand: `helm ${command.join(' ')}`
       });
 
-      // 執行指令
+      // Execute command
       const output = await helm.execute(command);
 
-      // 格式化輸出
+      // Format output
       const formattedOutput = this.formatListOutput(output, {
         ...args,
         allNamespaces: effectiveAllNamespaces
@@ -141,19 +141,19 @@ export class HelmListTool extends BaseTool {
 
     let command = ['list'];
 
-    // 命名空間參數處理
+    // Namespace parameter handling
     if (namespace) {
-      // 指定特定命名空間
+      // Specify specific namespace
       command.push('--namespace', namespace);
     } else if (allNamespaces === false) {
-      // 明確設置不使用所有命名空間，使用當前命名空間
-      // 不添加任何命名空間參數
+      // Explicitly set not to use all namespaces, use current namespace
+      // Don't add any namespace parameters
     } else {
-      // 預設或明確設置使用所有命名空間
+      // Default or explicitly set to use all namespaces
       command.push('-A');
     }
 
-    // 狀態篩選 - 根據 helm 的實際參數處理
+    // Status filtering - handle according to helm's actual parameters
     if (status && status.trim() !== '') {
       switch (status.toLowerCase()) {
         case 'all':
@@ -173,75 +173,69 @@ export class HelmListTool extends BaseTool {
           break;
         case 'deployed':
         default:
-          // deployed 是預設狀態，不需要額外參數
+          // deployed is the default status, no additional parameters needed
           break;
       }
     }
 
-    // 名稱篩選
+    // Name filtering
     if (filter) {
       command.push(filter);
     }
 
-    // 輸出格式
+    // Output format
     if (short) {
       command.push('--short');
     }
 
-    // 時間顯示
+    // Time display
     if (date) {
       command.push('--date');
     }
 
-    // 排序
+    // Sorting
     if (reverse) {
       command.push('--reverse');
     }
 
-    // 結果數量限制
-    if (max !== undefined && max !== null) {
-      command.push('--max', max.toString());
-    }
-
-    // 輸出格式
-    command.push('--output', 'table');
+    // Maximum results
+    command.push('--max', max.toString());
 
     return command;
   }
 
   formatListOutput(output, args) {
-    // 記錄原始輸出用於調試
-    logger.debug(`Helm 原始輸出長度: ${output.length}`);
-    logger.debug(`Helm 原始輸出前 500 字符: ${JSON.stringify(output.substring(0, 500))}`);
+    // Log original output for debugging
+    logger.debug(`Helm original output length: ${output.length}`);
+    logger.debug(`Helm original output first 500 characters: ${JSON.stringify(output.substring(0, 500))}`);
 
     if (!output.trim()) {
-      logger.debug('Helm 輸出為空');
+      logger.debug('Helm output is empty');
       return this.formatEmptyResult(args);
     }
 
     const lines = output.trim().split('\n');
-    logger.debug(`Helm 輸出總行數: ${lines.length}`);
+    logger.debug(`Helm output total line count: ${lines.length}`);
 
-    // 找到真正的資料行（包含制表符的行通常是資料行）
+    // Find actual data lines (lines containing tabs are usually data lines)
     const dataLines = [];
     let headerProcessed = false;
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
-      logger.debug(`行 ${i}: "${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`);
+      logger.debug(`Line ${i}: "${line.substring(0, 100)}${line.length > 100 ? '...' : ''}"`);
 
-      // 跳過空行
+      // Skip empty lines
       if (!line) {
         continue;
       }
 
-      // 檢查是否為資料行（包含制表符且不是純標題）
+      // Check if it's a data line (contains tabs and is not pure title)
       if (line.includes('\t')) {
-        // 如果這行包含典型的 helm release 欄位，則視為資料行
+        // If this line contains a typical helm release field pattern
+        // The second field should be the namespace, the third is the revision number, and the fifth is the status
         const fields = line.split('\t');
         if (fields.length >= 4) {
-          // 檢查是否包含 helm release 的典型欄位模式
-          // 第二個欄位應該是命名空間，第三個是修訂版本號，第五個是狀態
           if (fields[1] && fields[2] && fields[4] &&
               (fields[4].includes('deployed') || fields[4].includes('failed') ||
                fields[4].includes('pending') || fields[4].includes('superseded'))) {
@@ -252,110 +246,110 @@ export class HelmListTool extends BaseTool {
       }
     }
 
-    logger.debug(`找到的資料行數: ${dataLines.length}`);
+    logger.debug(`Found data line count: ${dataLines.length}`);
 
     if (dataLines.length === 0) {
-      logger.debug('沒有找到有效的 release 資料行');
+      logger.debug('No valid release data lines found');
       return this.formatEmptyResult(args);
     }
 
-    let result = `Helm Releases 列表\n`;
+    let result = `Helm Releases List\n`;
     result += `==================================================\n\n`;
 
-    // 執行的命令資訊
+    // Executed command information
     if (args.allNamespaces !== false && !args.namespace) {
-      result += `查詢範圍: 所有命名空間 (使用 -A 參數)\n`;
+      result += `Query range: All namespaces (using -A parameter)\n`;
     } else if (args.namespace) {
-      result += `查詢範圍: 命名空間 "${args.namespace}"\n`;
+      result += `Query range: Namespace "${args.namespace}"\n`;
     } else {
-      result += `查詢範圍: 當前命名空間\n`;
+      result += `Query range: Current namespace\n`;
     }
 
-    // 篩選資訊
+    // Filter information
     if (args.status && args.status.trim() !== '') {
-      result += `狀態篩選: 只顯示 "${args.status}" 狀態的 releases\n`;
+      result += `Status filtering: Only show releases in "${args.status}" status\n`;
     }
     if (args.filter && args.filter.trim() !== '') {
-      result += `名稱篩選: ${args.filter}\n`;
+      result += `Name filtering: ${args.filter}\n`;
     }
 
-    // 統計資訊
-    result += `找到 ${dataLines.length} 個 Helm release`;
+    // Statistics information
+    result += `Found ${dataLines.length} Helm releases`;
     if (args.status && args.status.trim() !== '') {
-      result += ` (僅 ${args.status} 狀態)`;
+      result += ` (only ${args.status} status)`;
     }
     result += `:\n\n`;
 
-    // 表格標題
+    // Table title
     result += `${'NAME'.padEnd(20)} ${'NAMESPACE'.padEnd(15)} ${'REVISION'.padEnd(8)} ${'STATUS'.padEnd(12)} ${'CHART'.padEnd(30)} APP VERSION\n`;
     result += `${'='.repeat(100)}\n`;
 
-    // 格式化每個 release
+    // Format each release
     dataLines.forEach(line => {
       const fields = line.split('\t').map(f => f.trim());
       if (fields.length >= 6) {
         const [name, namespace, revision, updated, status, chart, appVersion] = fields;
         result += `${name.padEnd(20)} ${namespace.padEnd(15)} ${revision.padEnd(8)} ${status.padEnd(12)} ${chart.padEnd(30)} ${appVersion || 'N/A'}\n`;
       } else {
-        // 如果欄位不足，直接顯示原始行
+        // If field is insufficient, directly display the original line
         result += `${line}\n`;
       }
     });
 
-    // 新增提示資訊
-    result += `\n說明：\n`;
-    result += `• NAME: Release 名稱\n`;
-    result += `• NAMESPACE: 部署的命名空間\n`;
-    result += `• REVISION: 修訂版本號\n`;
-    result += `• STATUS: 部署狀態\n`;
-    result += `• CHART: 使用的 Chart 名稱和版本\n`;
-    result += `• APP VERSION: 應用程式版本\n\n`;
+    // Add additional information
+    result += `\nNotes:\n`;
+    result += `• NAME: Release name\n`;
+    result += `• NAMESPACE: Deployed namespace\n`;
+    result += `• REVISION: Revision number\n`;
+    result += `• STATUS: Deployment status\n`;
+    result += `• CHART: Used Chart name and version\n`;
+    result += `• APP VERSION: Application version\n\n`;
 
-    result += `提示：\n`;
-    result += `• 使用 helm_status 查看 release 詳細狀態\n`;
-    result += `• 使用 helm_get_values 查看 release 配置值\n`;
-    result += `• 使用 helm_history 查看 release 歷史記錄\n`;
+    result += `Tips:\n`;
+    result += `• Use helm_status to view release detailed status\n`;
+    result += `• Use helm_get_values to view release configuration values\n`;
+    result += `• Use helm_history to view release history\n`;
 
     return result;
   }
 
   formatEmptyResult(args) {
-    let result = `Helm Releases 列表\n`;
+    let result = `Helm Releases List\n`;
     result += `==================================================\n\n`;
 
     if (args.namespace) {
-      result += `命名空間 "${args.namespace}" 中沒有找到 Helm release。\n\n`;
-      result += `可能的原因：\n`;
-      result += `• 命名空間中確實沒有部署 Helm releases\n`;
-      result += `• 命名空間 "${args.namespace}" 不存在\n`;
-      result += `• 沒有權限訪問此命名空間\n\n`;
+      result += `No Helm release found in namespace "${args.namespace}".\n\n`;
+      result += `Possible reasons:\n`;
+      result += `• There is actually no deployed Helm releases in the namespace\n`;
+      result += `• Namespace "${args.namespace}" does not exist\n`;
+      result += `• No permission to access this namespace\n\n`;
     } else if (args.allNamespaces !== false) {
-      result += `使用 -A 參數查看所有命名空間，但沒有找到`;
+      result += `Using -A parameter to view all namespaces, but no`;
       if (args.status && args.status.trim() !== '') {
-        result += `狀態為 "${args.status}" 的`;
+        result += ` releases in "${args.status}" status`;
       }
-      result += ` Helm release。\n\n`;
-      result += `可能的原因：\n`;
+      result += ` Helm release found.\n\n`;
+      result += `Possible reasons:\n`;
       if (args.status && args.status.trim() !== '') {
-        result += `• 沒有狀態為 "${args.status}" 的 releases（試試移除 status 參數查看所有狀態）\n`;
+        result += `• No releases in "${args.status}" status (try removing status parameter to view all status)\n`;
       }
-      result += `• 整個集群中確實沒有部署任何 Helm releases\n`;
-      result += `• 沒有權限跨命名空間查看 releases（需要 cluster-wide 權限）\n`;
-      result += `• kubeconfig 配置問題\n\n`;
+      result += `• There is actually no deployed Helm releases in the entire cluster\n`;
+      result += `• No permission to view releases across namespaces (requires cluster-wide permission)\n`;
+      result += `• kubeconfig configuration problem\n\n`;
     } else {
-      result += `在當前命名空間中沒有找到`;
+      result += `No`;
       if (args.status && args.status.trim() !== '') {
-        result += `狀態為 "${args.status}" 的`;
+        result += ` releases in "${args.status}" status`;
       }
-      result += ` Helm release。\n\n`;
+      result += ` Helm release found in the current namespace.\n\n`;
     }
 
-    result += `疑難排解：\n`;
-    result += `• 檢查 kubeconfig 配置: kubectl config current-context\n`;
-    result += `• 確認可訪問的命名空間: kubectl get namespaces\n`;
-    result += `• 測試原生 helm 命令: helm ls -A\n`;
-    result += `• 確保 Helm 已正確安裝和配置\n`;
-    result += `• 使用 helm_repo_list 查看已添加的 Chart repositories\n`;
+    result += `Troubleshooting:\n`;
+    result += `• Check kubeconfig configuration: kubectl config current-context\n`;
+    result += `• Confirm accessible namespaces: kubectl get namespaces\n`;
+    result += `• Test native helm command: helm ls -A\n`;
+    result += `• Ensure Helm is correctly installed and configured\n`;
+    result += `• Use helm_repo_list to view added Chart repositories\n`;
 
     return result;
   }

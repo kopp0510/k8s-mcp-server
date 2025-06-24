@@ -1,59 +1,59 @@
-# 使用官方 Node.js 18 Alpine 映像
+# Use official Node.js 18 Alpine image
 FROM node:18-alpine
 
-# 設定標籤
+# Set labels
 LABEL maintainer="danlio"
 LABEL description="Kubernetes MCP Server with SSE support for n8n"
 LABEL version="1.0.0"
 LABEL project="k8s-mcp-server"
 
-# 安裝必要工具：kubectl、helm 和 curl
+# Install required tools: kubectl, helm and curl
 RUN apk add --no-cache curl bash && \
-    # 安裝 kubectl
+    # Install kubectl
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/ && \
-    # 安裝 helm - 直接下載二進制檔案
+    # Install helm - download binary directly
     HELM_VERSION=$(curl -s https://api.github.com/repos/helm/helm/releases/latest | grep tag_name | cut -d '"' -f 4) && \
     curl -fsSL -o helm.tar.gz "https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz" && \
     tar -xzf helm.tar.gz && \
     mv linux-amd64/helm /usr/local/bin/helm && \
     rm -rf helm.tar.gz linux-amd64 && \
-    # 驗證安裝
+    # Verify installation
     kubectl version --client && \
     helm version --client && \
     apk del curl bash
 
-# 建立非 root 使用者
+# Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# 建立應用目錄
+# Create application directory
 WORKDIR /app
 
-# 複製 package 檔案並安裝依賴
+# Copy package files and install dependencies
 COPY package*.json ./
 RUN npm ci --only=production && npm cache clean --force
 
-# 複製應用程式碼
+# Copy application code
 COPY src/ ./src/
 
-# 設定權限
+# Set permissions
 RUN chown -R nodejs:nodejs /app
 
-# 切換到非 root 使用者
+# Switch to non-root user
 USER nodejs
 
-# 設定環境變數
+# Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 健康檢查
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# 預設端口
+# Default port
 EXPOSE 3000
 
-# 啟動指令 (SSE 模式)
+# Start command (SSE mode)
 CMD ["node", "src/index.js", "--http", "--port", "3000"]

@@ -1,56 +1,73 @@
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawn } from 'child_process';
 import { logger } from './logger.js';
 
-const execAsync = promisify(exec);
-
-class SimpleKubectl {
+export class KubectlRunner {
   constructor() {
-    this.timeout = 30000; // 30 秒超時
+    this.timeout = 30000; // 30 second timeout
   }
 
   async execute(args) {
-    // 驗證參數
+    // Validate parameters
     if (!Array.isArray(args) || args.length === 0) {
-      throw new Error('kubectl 參數必須是非空陣列');
+      throw new Error('kubectl arguments must be a non-empty array');
     }
 
-    // 建構指令
-    const command = ['kubectl', ...args].join(' ');
+    // Build command
+    const command = `kubectl ${args.join(' ')}`;
 
-    logger.debug(`執行 kubectl: ${command}`);
+    logger.debug(`Executing kubectl: ${command}`);
 
-    try {
-      const { stdout, stderr } = await execAsync(command, {
-        timeout: this.timeout,
-        maxBuffer: 1024 * 1024 * 10 // 10MB buffer
+    return new Promise((resolve, reject) => {
+      const kubectl = spawn('kubectl', args, {
+        stdio: ['pipe', 'pipe', 'pipe']
       });
 
-      if (stderr && !stdout) {
-        throw new Error(stderr);
-      }
+      let stdout = '';
+      let stderr = '';
 
-      if (stderr) {
-        logger.warn(`kubectl 警告: ${stderr}`);
-      }
+      kubectl.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
 
-      return stdout;
+      kubectl.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-    } catch (error) {
-      logger.error(`kubectl 執行失敗: ${command}`, error);
+      kubectl.on('close', (code) => {
+        if (stderr && !stdout) {
+          logger.warn(`kubectl warning: ${stderr}`);
+        }
 
-      // 處理常見錯誤
-      if (error.code === 'ETIMEDOUT') {
-        throw new Error('kubectl 指令執行超時');
-      }
+        if (code === 0) {
+          resolve(stdout.trim());
+        } else {
+          logger.error(`kubectl execution failed: ${command}`, { code, stderr });
 
-      if (error.stderr) {
-        throw new Error(error.stderr);
-      }
+          // Handle common errors
+          if (stderr.includes('timeout')) {
+            reject(new Error('kubectl command execution timeout'));
+          } else if (stderr.includes('not found')) {
+            reject(new Error(`Resource not found: ${stderr.trim()}`));
+          } else if (stderr.includes('connection refused')) {
+            reject(new Error(`Unable to connect to cluster: ${stderr.trim()}`));
+          } else {
+            reject(new Error(`kubectl execution failed: ${stderr.trim() || `Exit code: ${code}`}`));
+          }
+        }
+      });
 
-      throw new Error(`kubectl 執行失敗: ${error.message}`);
-    }
+      kubectl.on('error', (error) => {
+        logger.error(`kubectl execution failed: ${command}`, error);
+        reject(new Error(`kubectl execution failed: ${error.message}`));
+      });
+
+      // Set timeout
+      setTimeout(() => {
+        kubectl.kill('SIGTERM');
+        reject(new Error('kubectl command timeout'));
+      }, this.timeout);
+    });
   }
 }
 
-export const kubectl = new SimpleKubectl();
+export const kubectl = new KubectlRunner();

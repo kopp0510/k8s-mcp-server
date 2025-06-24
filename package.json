@@ -1,7 +1,7 @@
 {
   "name": "kubernetes-mcp-server",
   "version": "2.2.0",
-  "description": "自開發的 Kubernetes & Helm MCP Server",
+  "description": "Self-developed Kubernetes & Helm MCP Server",
   "type": "module",
   "main": "src/index.js",
   "bin": {
