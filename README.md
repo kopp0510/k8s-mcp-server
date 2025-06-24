@@ -33,7 +33,8 @@ k8s-mcp-server/
 │   │   ├── helm-list.js           # Helm release 列表工具
 │   │   ├── helm-status.js         # Helm release 狀態工具
 │   │   ├── helm-repo-list.js      # Helm repository 列表工具
-│   │   └── helm-get-values.js     # Helm release 配置值工具
+│   │   ├── helm-get-values.js     # Helm release 配置值工具
+│   │   └── helm-history.js        # Helm release 歷史記錄工具
 │   └── utils/                     # 工具函數
 │       ├── logger.js              # 日誌系統
 │       ├── validator.js           # 輸入驗證 (包含標籤驗證)
@@ -2634,49 +2635,111 @@ npm run start:http
 - 專為 n8n MCP Client 設計
 - 提供即時雙向通訊
 
-### Stdio 模式 (命令列工具)
+### Stdio 模式 (Cursor 編輯器和命令列工具)
 ```bash
 npm start
 ```
 - 標準輸入/輸出模式
-- 適用於命令列 MCP 客戶端
+- 適用於 Cursor 編輯器和命令列 MCP 客戶端
 - 輕量級，適合腳本使用
+
+## Cursor 編輯器配置
+
+### 配置 MCP 服務器
+
+在 Cursor 編輯器中使用本 MCP Server，需要在 `~/.cursor/mcp.json` 中添加配置：
+
+#### 1. 使用本地版本（推薦）
+
+```json
+{
+  "mcpServers": {
+    "k8s-mcp-server": {
+      "command": "node",
+      "args": [
+        "/path/to/your/k8s-mcp/k8s-mcp-server/src/index.js"
+      ]
+    }
+  }
+}
+```
+
+#### 2. 使用 Docker 映像
+
+```json
+{
+  "mcpServers": {
+    "k8s-mcp-server": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i",
+        "--network=host",
+        "-v", "/Users/your-username/.kube:/home/nodejs/.kube:ro",
+        "your-registry/kubectl-mcp-tool:latest",
+        "node", "src/index.js"
+      ]
+    }
+  }
+}
+```
+
+### 使用步驟
+
+1. **確保 kubectl 和 helm 可用**
+   ```bash
+   kubectl version --client
+   helm version
+   ```
+
+2. **確保 kubeconfig 配置正確**
+   ```bash
+   kubectl get nodes
+   ```
+
+3. **重新啟動 Cursor 編輯器**
+
+4. **在 Cursor 中使用 MCP 工具**
+   - 工具會自動出現在 MCP 面板中
+   - 可以直接調用 16 個 Kubernetes 和 Helm 工具
+
+### 可用的 MCP 工具
+
+#### Kubernetes 工具 (11項)
+- `kubectl_get` - 取得 Kubernetes 資源
+- `kubectl_logs` - 查看 Pod 日誌
+- `kubectl_describe` - 描述資源詳細資訊
+- `kubectl_cluster_info` - 查看叢集資訊
+- `kubectl_get_yaml` - 取得 YAML 格式輸出
+- `kubectl_top_nodes` - 節點資源監控
+- `kubectl_top_pods` - Pod 資源監控
+- `kubectl_top_containers` - 容器資源監控
+- `kubectl_scale_deployment` - 擴縮部署
+- `kubectl_restart_deployment` - 重啟部署
+- `kubectl_edit_hpa` - 編輯 HPA
+
+#### Helm 工具 (5項)
+- `helm_list` - 列出 Helm releases
+- `helm_status` - 查看 release 狀態
+- `helm_get_values` - 查看配置值
+- `helm_repo_list` - 列出 repositories
+- `helm_history` - 查看部署歷史
 
 ## 開發計劃
 
-### 已完成 (33項)
+### 已完成 (16項工具)
 
-#### Kubernetes 工具 (25項)
-- [x] **Get Pods** - 取得 Pod 列表和詳細資訊
-- [x] **Get Nodes** - 取得 Node 列表和詳細資訊
-- [x] **Get Deployments** - 取得 Deployment 列表和詳細資訊
-- [x] **Get Services** - 取得 Service 列表和詳細資訊
-- [x] **Get ReplicaSets** - 取得 ReplicaSet 列表和詳細資訊
-- [x] **Get DaemonSets** - 取得 DaemonSet 列表和詳細資訊
-- [x] **Get StatefulSets** - 取得 StatefulSet 列表和詳細資訊
-- [x] **Get Jobs/CronJobs** - 取得 Job 和 CronJob 列表和詳細資訊
-- [x] **Get ConfigMaps** - 取得 ConfigMap 列表和詳細資訊
-- [x] **Get Secrets** - 取得 Secret 列表和詳細資訊
-- [x] **Get PersistentVolumes** - 取得 PV 列表和詳細資訊
-- [x] **Get PersistentVolumeClaims** - 取得 PVC 列表和詳細資訊
-- [x] **Get Ingress** - 取得 Ingress 列表和詳細資訊
-- [x] **Get HPA** - 取得 HorizontalPodAutoscaler 列表和詳細資訊
-- [x] **Get Namespaces** - 取得 Namespace 列表和詳細資訊
-- [x] **Get Events** - 取得 Event 列表和詳細資訊
-- [x] **Get ServiceAccounts** - 取得 ServiceAccount 列表和詳細資訊
-- [x] **Get ClusterRoles** - 取得 ClusterRole 列表和詳細資訊
-- [x] **Get ClusterRoleBindings** - 取得 ClusterRoleBinding 列表和詳細資訊
-- [x] **Get Cluster Info** - 取得叢集資訊和服務端點
-- [x] **Get Resource YAML** - 取得資源 YAML 格式輸出
-- [x] **Top Nodes** - 查看 Node 資源使用情況（需要 metrics-server）
-- [x] **Top Pods** - 查看 Pod 資源使用情況（需要 metrics-server）
-- [x] **Top Containers** - 查看容器資源使用情況（需要 metrics-server）
-- [x] **Describe Resources** - 描述各種資源的詳細資訊
-- [x] **Get Pod Logs** - 查看 Pod 日誌
-- [x] **Scale Deployment** - 擴縮 Deployment 副本數量
-- [x] **Restart Deployment** - 重啟 Deployment（滾動重啟）
-- [x] **Edit HPA** - 編輯 HorizontalPodAutoscaler 副本數量範圍
-- [x] **Filter by Labels** - 按標籤篩選 (支援 labelSelector 和 labels 參數)
+#### Kubernetes 工具 (11項)
+- [x] **kubectl_get** - 取得各種 Kubernetes 資源 (支援 19 種資源類型：pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events, serviceaccounts, clusterroles, clusterrolebindings)
+- [x] **kubectl_logs** - 查看 Pod 日誌
+- [x] **kubectl_describe** - 描述各種資源的詳細資訊
+- [x] **kubectl_cluster_info** - 取得叢集資訊和服務端點
+- [x] **kubectl_get_yaml** - 取得資源 YAML 格式輸出
+- [x] **kubectl_top_nodes** - 查看 Node 資源使用情況（需要 metrics-server）
+- [x] **kubectl_top_pods** - 查看 Pod 資源使用情況（需要 metrics-server）
+- [x] **kubectl_top_containers** - 查看容器資源使用情況（需要 metrics-server）
+- [x] **kubectl_scale_deployment** - 擴縮 Deployment 副本數量
+- [x] **kubectl_restart_deployment** - 重啟 Deployment（滾動重啟）
+- [x] **kubectl_edit_hpa** - 編輯 HorizontalPodAutoscaler 副本數量範圍
 
 #### Helm 工具 (5項)
 - [x] **Helm List** - 列出 Helm releases，支援多種篩選選項（包含 -A 參數）
@@ -2684,13 +2747,6 @@ npm start
 - [x] **Helm Get Values** - 查看 Helm release 的配置值
 - [x] **Helm Repo List** - 列出已添加的 Helm chart repositories
 - [x] **Helm History** - 查看 Helm release 的部署歷史記錄
-
-#### 系統架構 (4項)
-- [x] 模組化工具架構
-- [x] SSE 連接支援 (n8n 相容)
-- [x] 健康檢查端點
-- [x] 輸入驗證和安全性
-- [x] 智慧錯誤處理和格式化輸出
 
 ### 未完成功能 (依分類整理)
 
@@ -2701,10 +2757,20 @@ npm start
 - [ ] **Delete Resource** - 刪除資源
 
 ### 功能統計
-- **已完成**: 34項核心功能 (Kubernetes: 25項 + Helm: 5項 + 系統: 4項)
+- **已完成**: 16項工具 (Kubernetes: 11項 + Helm: 5項)
 - **待開發**: 4項功能
-- **總計**: 38項功能
-- **完成度**: 89.5%
+- **總計**: 20項功能
+- **完成度**: 80%
+
+### 特色功能
+- **標籤篩選支援** - kubectl_get 工具支援 labelSelector 和 labels 參數
+- **多資源類型** - kubectl_get 支援 19 種不同的 Kubernetes 資源類型
+- **資源監控** - 完整的 top 命令支援 (nodes, pods, containers)
+- **部署管理** - 支援擴縮和重啟 Deployment
+- **HPA 管理** - 安全的 HPA 編輯功能
+- **Helm 整合** - 完整的 Helm 管理功能
+- **SSE 連接** - 專為 n8n 設計的即時通訊
+- **模組化架構** - 清晰的工具分離和基底類別設計
 
 ## 授權
 

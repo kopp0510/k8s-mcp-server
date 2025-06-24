@@ -526,10 +526,12 @@ export async function createMCPServer(config) {
       };
 
     } else {
-      // Stdio 模式 (預設)
+      // Stdio 模式 (預設) - 使用 MCP SDK 標準方式
       logger.info('啟動 MCP Server (stdio 模式)');
+
       const transport = new StdioServerTransport();
       await server.connect(transport);
+
       logger.info('MCP Server 已啟動並監聽 stdio');
       logger.info(`可用工具: ${availableTools.map(t => t.name).join(', ')}`);
 
@@ -537,7 +539,7 @@ export async function createMCPServer(config) {
       return {
         close: async () => {
           logger.info('正在關閉 MCP Server...');
-          // MCP Server 沒有明確的關閉方法，這裡只是記錄
+          // 在 Stdio 模式下，伺服器會隨著程序結束而關閉
         }
       };
     }
