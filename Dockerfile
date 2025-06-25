@@ -7,8 +7,8 @@ LABEL description="Kubernetes MCP Server with SSE support for n8n"
 LABEL version="1.0.0"
 LABEL project="k8s-mcp-server"
 
-# Install required tools: kubectl, helm and curl
-RUN apk add --no-cache curl bash && \
+# Install required tools: kubectl, helm, gcloud CLI and curl
+RUN apk add --no-cache curl bash python3 py3-pip && \
     # Install kubectl
     curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && \
     chmod +x kubectl && \
@@ -19,10 +19,25 @@ RUN apk add --no-cache curl bash && \
     tar -xzf helm.tar.gz && \
     mv linux-amd64/helm /usr/local/bin/helm && \
     rm -rf helm.tar.gz linux-amd64 && \
+    # Install gcloud CLI to /usr/local/google-cloud-sdk
+    curl -O https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-cli-458.0.1-linux-x86_64.tar.gz && \
+    tar -xf google-cloud-cli-458.0.1-linux-x86_64.tar.gz && \
+    mv google-cloud-sdk /usr/local/google-cloud-sdk && \
+    /usr/local/google-cloud-sdk/install.sh --quiet --path-update=false && \
+    rm -rf google-cloud-cli-458.0.1-linux-x86_64.tar.gz && \
+    # Install GKE auth plugin (required for GKE clusters)
+    /usr/local/google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin --quiet && \
+    # Create symlink for gcloud and auth plugin to make them globally available
+    ln -s /usr/local/google-cloud-sdk/bin/gcloud /usr/local/bin/gcloud && \
+    ln -s /usr/local/google-cloud-sdk/bin/gsutil /usr/local/bin/gsutil && \
+    ln -s /usr/local/google-cloud-sdk/bin/gke-gcloud-auth-plugin /usr/local/bin/gke-gcloud-auth-plugin && \
     # Verify installation
     kubectl version --client && \
     helm version --client && \
-    apk del curl bash
+    gcloud version && \
+    gke-gcloud-auth-plugin --version && \
+    # Clean up build dependencies but keep python3 for gcloud
+    apk del curl
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -47,6 +62,7 @@ USER nodejs
 # Set environment variables
 ENV NODE_ENV=production
 ENV PORT=3000
+ENV USE_GKE_GCLOUD_AUTH_PLUGIN=True
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \

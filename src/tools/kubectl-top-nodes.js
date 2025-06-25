@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlTopNodesTool extends BaseTool {
   constructor() {
@@ -31,7 +32,7 @@ export class KubectlTopNodesTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
+      validator.validateInput(args, this.getDefinition().inputSchema);
 
       const { sortBy } = args;
 

@@ -6,6 +6,7 @@
 import { BaseTool } from './base-tool.js';
 import { helm } from '../utils/helm.js';
 import { logger } from '../utils/logger.js';
+import { validator } from '../utils/validator.js';
 
 export class HelmHistoryTool extends BaseTool {
   constructor() {
@@ -48,7 +49,7 @@ export class HelmHistoryTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
+      validator.validateInput(args, this.getDefinition().inputSchema);
 
       const {
         releaseName,

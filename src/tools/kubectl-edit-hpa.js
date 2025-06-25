@@ -8,6 +8,7 @@ import { kubectl } from '../utils/kubectl.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
+import { validator } from '../utils/validator.js';
 
 export class KubectlEditHpaTool extends BaseTool {
   constructor() {
@@ -57,8 +58,7 @@ export class KubectlEditHpaTool extends BaseTool {
 
   async execute(args) {
     try {
-      // According to k8s-mcp-server.mdc specification, all inputs must pass validation
-      this.validateInput(args);
+      validator.validateInput(args, this.getDefinition().inputSchema);
 
       const {
         hpaName,

@@ -77,7 +77,7 @@ export class KubectlGetTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
+      validator.validateInput(args, this.getDefinition().inputSchema);
 
       const { resource, namespace, allNamespaces, name, labelSelector, labels } = args;
 
@@ -161,7 +161,14 @@ export class KubectlGetTool extends BaseTool {
       };
 
       this.logSuccess(args, { content: [{ text: `Found ${logDetails.itemCount} resources` }] });
-      return this.createJsonResponse(jsonData);
+      return {
+        content: [
+          {
+            type: 'json',
+            json: jsonData
+          }
+        ]
+      };
 
     } catch (error) {
       this.logError(args, error);

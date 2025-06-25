@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { helm } from '../utils/helm.js';
+import { validator } from '../utils/validator.js';
 
 export class HelmRepoListTool extends BaseTool {
   constructor() {
@@ -32,7 +33,7 @@ export class HelmRepoListTool extends BaseTool {
 
   async execute(args) {
     try {
-      this.validateInput(args);
+      validator.validateInput(args, this.getDefinition().inputSchema);
 
       const { output = 'table' } = args;
 
