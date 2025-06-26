@@ -59,6 +59,10 @@ export class HelmListTool extends BaseTool {
             minimum: 1,
             maximum: 1000,
             default: 256
+          },
+          cluster: {
+            type: 'string',
+            description: 'Target cluster ID (optional, uses default cluster if not specified)',
           }
         },
         required: []
@@ -78,8 +82,14 @@ export class HelmListTool extends BaseTool {
         short = false,
         date = true,
         reverse = false,
-        max = 256
+        max = 256,
+        cluster
       } = args;
+
+      // 驗證叢集 ID (如果提供)
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate parameter combination - only check conflicts when allNamespaces is explicitly set
       if (namespace && args.allNamespaces === true) {
@@ -110,8 +120,8 @@ export class HelmListTool extends BaseTool {
         finalCommand: `helm ${command.join(' ')}`
       });
 
-      // Execute command
-      const output = await helm.execute(command);
+      // Execute command (傳遞叢集參數)
+      const output = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatListOutput(output, {

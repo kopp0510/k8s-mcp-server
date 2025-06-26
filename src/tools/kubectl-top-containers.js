@@ -39,6 +39,12 @@ export class KubectlTopContainersTool extends BaseTool {
           containerName: {
             type: 'string',
             description: 'Filter containers containing specific name (fuzzy matching)'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -55,20 +61,26 @@ export class KubectlTopContainersTool extends BaseTool {
         allNamespaces,
         sortBy,
         podName,
-        containerName
+        containerName,
+        cluster
       } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
 
       // Check if metrics-server is installed and running
-      await this.checkMetricsServer();
+      await this.checkMetricsServer(cluster);
 
       // Build kubectl top pods --containers command
       const command = this.buildTopCommand(namespace, allNamespaces, sortBy);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       // Parse and filter container data
       const containerData = this.parseContainerData(result);
@@ -99,11 +111,11 @@ export class KubectlTopContainersTool extends BaseTool {
     }
   }
 
-  async checkMetricsServer() {
+  async checkMetricsServer(cluster) {
     try {
       // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await kubectl.execute(checkCommand);
+      const result = await kubectl.execute(checkCommand, cluster);
 
       const deployment = JSON.parse(result);
 

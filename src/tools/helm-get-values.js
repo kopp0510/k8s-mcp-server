@@ -42,6 +42,12 @@ export class HelmGetValuesTool extends BaseTool {
             type: 'boolean',
             description: 'Show all values including default values (default: false)',
             default: false
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['releaseName']
@@ -58,8 +64,14 @@ export class HelmGetValuesTool extends BaseTool {
         namespace,
         revision,
         output = 'yaml',
-        allValues = false
+        allValues = false,
+        cluster
       } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Build helm get values command
       const command = this.buildHelmGetValuesCommand({
@@ -70,8 +82,8 @@ export class HelmGetValuesTool extends BaseTool {
         allValues
       });
 
-      // Execute command
-      const result = await helm.execute(command);
+      // Execute command with cluster support
+      const result = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatValuesOutput(result, args);

@@ -24,6 +24,12 @@ export class HelmRepoListTool extends BaseTool {
             description: 'Output format',
             enum: ['table', 'json', 'yaml'],
             default: 'table'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -35,13 +41,18 @@ export class HelmRepoListTool extends BaseTool {
     try {
       validator.validateInput(args, this.getDefinition().inputSchema);
 
-      const { output = 'table' } = args;
+      const { output = 'table', cluster } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Build helm repo list command
       const command = this.buildHelmRepoListCommand(output);
 
-      // Execute command
-      const result = await helm.execute(command);
+      // Execute command with cluster support
+      const result = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatRepoListOutput(result, output);

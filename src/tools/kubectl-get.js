@@ -40,6 +40,10 @@ export class KubectlGetTool extends BaseTool {
             type: 'object',
             description: 'Label key-value pairs object (e.g.: {"app": "nginx", "environment": "prod"})',
           },
+          cluster: {
+            type: 'string',
+            description: 'Target cluster ID (optional, uses default cluster if not specified)',
+          },
         },
         required: ['resource'],
       },
@@ -79,7 +83,12 @@ export class KubectlGetTool extends BaseTool {
     try {
       validator.validateInput(args, this.getDefinition().inputSchema);
 
-      const { resource, namespace, allNamespaces, name, labelSelector, labels } = args;
+      const { resource, namespace, allNamespaces, name, labelSelector, labels, cluster } = args;
+
+      // 驗證叢集 ID (如果提供)
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate resource type
       const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts', 'clusterroles', 'clusterrolebindings'];
@@ -93,9 +102,8 @@ export class KubectlGetTool extends BaseTool {
         if (namespace) {
           throw new Error(`${resource} resource does not support namespace parameter (cluster-scoped resource)`);
         }
-        if (allNamespaces) {
-          throw new Error(`${resource} resource does not support allNamespaces parameter (cluster-scoped resource)`);
-        }
+        // For cluster-scoped resources, silently ignore allNamespaces parameter instead of throwing error
+        // This provides better user experience when querying resources like 'namespaces'
       }
 
       // namespace and allNamespaces cannot be used together
@@ -139,8 +147,8 @@ export class KubectlGetTool extends BaseTool {
 
       kubectlArgs.push('-o', 'json');
 
-      // Execute command
-      const result = await kubectl.execute(kubectlArgs);
+      // Execute command (傳遞叢集參數)
+      const result = await kubectl.execute(kubectlArgs, cluster);
 
       // Parse JSON result
       let jsonData;
@@ -157,6 +165,7 @@ export class KubectlGetTool extends BaseTool {
         allNamespaces,
         name,
         labelSelector: finalLabelSelector,
+        cluster: cluster || 'default',
         itemCount: jsonData.items ? jsonData.items.length : (jsonData.kind ? 1 : 0)
       };
 

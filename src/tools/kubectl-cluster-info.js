@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlClusterInfoTool extends BaseTool {
   constructor() {
@@ -23,6 +24,12 @@ export class KubectlClusterInfoTool extends BaseTool {
             description: 'Get detailed cluster state dump information (equivalent to kubectl cluster-info dump)',
             default: false,
           },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
+          }
         },
         required: [],
       },
@@ -31,7 +38,12 @@ export class KubectlClusterInfoTool extends BaseTool {
 
   async execute(args) {
     try {
-      const { dump = false } = args;
+      const { dump = false, cluster } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Build kubectl command
       const cmdArgs = ['cluster-info'];
@@ -39,8 +51,8 @@ export class KubectlClusterInfoTool extends BaseTool {
         cmdArgs.push('dump');
       }
 
-      // Execute command
-      const result = await kubectl.execute(cmdArgs);
+      // Execute command with cluster support
+      const result = await kubectl.execute(cmdArgs, cluster);
 
       // If dump mode, return raw output directly
       if (dump) {

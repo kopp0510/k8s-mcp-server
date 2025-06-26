@@ -41,6 +41,12 @@ export class HelmStatusTool extends BaseTool {
             type: 'boolean',
             description: 'Show Helm hooks (default: false)',
             default: false
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['releaseName']
@@ -57,8 +63,14 @@ export class HelmStatusTool extends BaseTool {
         namespace,
         revision,
         showResources = false,
-        showHooks = false
+        showHooks = false,
+        cluster
       } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Build helm status command
       const command = this.buildHelmStatusCommand({
@@ -69,8 +81,8 @@ export class HelmStatusTool extends BaseTool {
         showHooks
       });
 
-      // Execute command
-      const output = await helm.execute(command);
+      // Execute command with cluster support
+      const output = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatStatusOutput(output, args);

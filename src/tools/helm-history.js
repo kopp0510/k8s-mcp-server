@@ -40,6 +40,12 @@ export class HelmHistoryTool extends BaseTool {
             description: 'Output format (default: table)',
             enum: ['table', 'json', 'yaml'],
             default: 'table'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['releaseName']
@@ -55,8 +61,14 @@ export class HelmHistoryTool extends BaseTool {
         releaseName,
         namespace,
         max = 256,
-        output = 'table'
+        output = 'table',
+        cluster
       } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate release name
       if (!releaseName || releaseName.trim() === '') {
@@ -77,8 +89,8 @@ export class HelmHistoryTool extends BaseTool {
         finalCommand: `helm ${command.join(' ')}`
       });
 
-      // Execute command
-      const helmOutput = await helm.execute(command);
+      // Execute command with cluster support
+      const helmOutput = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatHistoryOutput(helmOutput, args);
@@ -198,16 +210,18 @@ export class HelmHistoryTool extends BaseTool {
 
     let header = `Helm Release History`;
     header += '\n' + '='.repeat(50);
-    header += `\n\n• Release name: ${releaseName}`;
+    header += '\n';
+    header += `\n**Release Information:**`;
+    header += `\n• Name: ${releaseName}`;
+
     if (namespace) {
       header += `\n• Namespace: ${namespace}`;
+    } else {
+      header += `\n• Namespace: (default namespace)`;
     }
-    if (max && max !== 256) {
-      header += `\n• Maximum records: ${max}`;
-    }
-    if (output && output !== 'table') {
-      header += `\n• Output format: ${output.toUpperCase()}`;
-    }
+
+    header += `\n• Maximum records: ${max}`;
+    header += `\n• Output format: ${output.toUpperCase()}`;
 
     return header;
   }

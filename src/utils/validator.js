@@ -297,6 +297,38 @@ class SimpleValidator {
       throw new Error(`Annotation key "${key}" contains invalid characters`);
     }
   }
+
+  /**
+   * 驗證叢集 ID 格式
+   * 叢集 ID 用作 kubectl context 名稱，需要符合安全規範
+   */
+  validateClusterId(clusterId) {
+    if (!clusterId || typeof clusterId !== 'string') {
+      throw new Error('叢集 ID 必須是非空字串');
+    }
+
+    if (clusterId.length > 64) {
+      throw new Error('叢集 ID 長度不能超過 64 字元');
+    }
+
+    // 叢集 ID 格式：字母、數字、連字號、底線、點號
+    // 不允許特殊字元，防止指令注入
+    const clusterIdRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
+    if (!clusterIdRegex.test(clusterId)) {
+      throw new Error('叢集 ID 格式無效。必須以字母或數字開頭和結尾，可包含字母、數字、連字號、底線、點號');
+    }
+
+    // 檢查是否包含連續的特殊字元
+    if (clusterId.includes('--') || clusterId.includes('__') || clusterId.includes('..')) {
+      throw new Error('叢集 ID 不能包含連續的特殊字元');
+    }
+
+    // 檢查保留字
+    const reservedWords = ['default', 'system', 'admin', 'root', 'kubernetes', 'kube-system'];
+    if (reservedWords.includes(clusterId.toLowerCase())) {
+      throw new Error(`叢集 ID 不能使用保留字：${clusterId}`);
+    }
+  }
 }
 
 export const validator = new SimpleValidator();

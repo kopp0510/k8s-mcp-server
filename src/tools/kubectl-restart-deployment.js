@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlRestartDeploymentTool extends BaseTool {
   constructor() {
@@ -35,6 +36,12 @@ export class KubectlRestartDeploymentTool extends BaseTool {
             description: 'Wait timeout in seconds (default: 300)',
             minimum: 30,
             maximum: 1800
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['deploymentName']
@@ -48,23 +55,29 @@ export class KubectlRestartDeploymentTool extends BaseTool {
         deploymentName,
         namespace = 'default',
         wait = false,
-        timeout = 300
+        timeout = 300,
+        cluster
       } = args;
 
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
       // Check if Deployment exists and get current state
-      const beforeState = await this.getDeploymentState(deploymentName, namespace);
+      const beforeState = await this.getDeploymentState(deploymentName, namespace, cluster);
 
       // Execute restart operation
-      await this.restartDeployment(deploymentName, namespace);
+      await this.restartDeployment(deploymentName, namespace, cluster);
 
       // If wait is required, wait for restart to complete
       let afterState;
       if (wait) {
-        afterState = await this.waitForRestartComplete(deploymentName, namespace, timeout, beforeState.generation);
+        afterState = await this.waitForRestartComplete(deploymentName, namespace, timeout, beforeState.generation, cluster);
       } else {
         // Brief wait then get state
         await this.sleep(3000);
-        afterState = await this.getDeploymentState(deploymentName, namespace);
+        afterState = await this.getDeploymentState(deploymentName, namespace, cluster);
       }
 
       // Format final result
@@ -77,10 +90,10 @@ export class KubectlRestartDeploymentTool extends BaseTool {
     }
   }
 
-  async getDeploymentState(deploymentName, namespace) {
+  async getDeploymentState(deploymentName, namespace, cluster) {
     try {
       const command = ['get', 'deployment', deploymentName, '-n', namespace, '-o', 'json'];
-      const result = await kubectl.execute(command);
+      const result = await kubectl.execute(command, cluster);
 
       const deployment = JSON.parse(result);
 
@@ -105,22 +118,22 @@ export class KubectlRestartDeploymentTool extends BaseTool {
     }
   }
 
-  async restartDeployment(deploymentName, namespace) {
+  async restartDeployment(deploymentName, namespace, cluster) {
     try {
       const command = ['rollout', 'restart', 'deployment', deploymentName, '-n', namespace];
-      await kubectl.execute(command);
+      await kubectl.execute(command, cluster);
     } catch (error) {
       throw new Error(`Failed to restart Deployment: ${error.message}`);
     }
   }
 
-  async waitForRestartComplete(deploymentName, namespace, timeout, originalGeneration) {
+  async waitForRestartComplete(deploymentName, namespace, timeout, originalGeneration, cluster) {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const state = await this.getDeploymentState(deploymentName, namespace);
+        const state = await this.getDeploymentState(deploymentName, namespace, cluster);
 
         // Check if restart is complete
         // 1. generation should be greater than original value (spec updated)
@@ -144,7 +157,7 @@ export class KubectlRestartDeploymentTool extends BaseTool {
     }
 
     // Timeout, get final status
-    const finalState = await this.getDeploymentState(deploymentName, namespace);
+    const finalState = await this.getDeploymentState(deploymentName, namespace, cluster);
     finalState.timeout = true;
     return finalState;
   }

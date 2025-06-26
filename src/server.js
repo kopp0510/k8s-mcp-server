@@ -29,6 +29,10 @@ import { HelmRepoListTool } from './tools/helm-repo-list.js';
 import { HelmGetValuesTool } from './tools/helm-get-values.js';
 import { HelmHistoryTool } from './tools/helm-history.js';
 
+// Import cluster management tools
+import { ClusterListTool } from './tools/cluster-list.js';
+import { GkeAuthTool } from './tools/gke-auth.js';
+
 /**
  * Create and configure MCP Server
  */
@@ -58,6 +62,10 @@ function setupMCPServer() {
   const helmRepoListTool = new HelmRepoListTool();
   const helmGetValuesTool = new HelmGetValuesTool();
   const helmHistoryTool = new HelmHistoryTool();
+
+  // Initialize cluster management tool instances
+  const clusterListTool = new ClusterListTool();
+  const gkeAuthTool = new GkeAuthTool();
 
   // Register tools to MCP Server
   server.tool(
@@ -189,6 +197,23 @@ function setupMCPServer() {
     }
   );
 
+  // Register cluster management tools to MCP Server
+  server.tool(
+    clusterListTool.name,
+    clusterListTool.getDefinition().inputSchema,
+    async (args) => {
+      return await clusterListTool.execute(args);
+    }
+  );
+
+  server.tool(
+    gkeAuthTool.name,
+    gkeAuthTool.getDefinition().inputSchema,
+    async (args) => {
+      return await gkeAuthTool.execute(args);
+    }
+  );
+
   // Create available tools list
   const availableTools = [
     // Kubectl tools
@@ -208,7 +233,10 @@ function setupMCPServer() {
     helmStatusTool.getDefinition(),
     helmRepoListTool.getDefinition(),
     helmGetValuesTool.getDefinition(),
-    helmHistoryTool.getDefinition()
+    helmHistoryTool.getDefinition(),
+    // Cluster management tools
+    clusterListTool.getDefinition(),
+    gkeAuthTool.getDefinition()
   ];
 
   return {
@@ -232,7 +260,10 @@ function setupMCPServer() {
       helmStatusTool,
       helmRepoListTool,
       helmGetValuesTool,
-      helmHistoryTool
+      helmHistoryTool,
+      // Cluster management tools
+      clusterListTool,
+      gkeAuthTool
     }
   };
 }
@@ -245,7 +276,9 @@ function createMCPHandler(tools, availableTools) {
     // Kubectl tools
     kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool,
     // Helm tools
-    helmListTool, helmStatusTool, helmRepoListTool, helmGetValuesTool, helmHistoryTool
+    helmListTool, helmStatusTool, helmRepoListTool, helmGetValuesTool, helmHistoryTool,
+    // Cluster management tools
+    clusterListTool, gkeAuthTool
   } = tools;
 
   return async (message) => {
@@ -318,6 +351,13 @@ function createMCPHandler(tools, availableTools) {
             break;
           case 'helm_history':
             result = await helmHistoryTool.execute(toolArgs);
+            break;
+          // Cluster management tools
+          case 'cluster_list':
+            result = await clusterListTool.execute(toolArgs);
+            break;
+          case 'gke_auth':
+            result = await gkeAuthTool.execute(toolArgs);
             break;
           default:
             throw new Error(`Unknown tool: ${toolName}`);

@@ -31,6 +31,12 @@ export class KubectlDescribeTool extends BaseTool {
           namespace: {
             type: 'string',
             description: 'Namespace (for namespaced resources, defaults to default)'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['resource', 'name']
@@ -38,13 +44,18 @@ export class KubectlDescribeTool extends BaseTool {
     };
   }
 
-  async execute({ resource, name, namespace = 'default' }) {
+  async execute({ resource, name, namespace = 'default', cluster }) {
     // Define namespaced resource types (moved to top of function to avoid scope issues)
     const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
 
     try {
       // Validate input
-      validator.validateInput({ resource, name, namespace });
+      validator.validateInput({ resource, name, namespace, cluster });
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate resource name
       validator.validateResourceName(name);
@@ -54,7 +65,7 @@ export class KubectlDescribeTool extends BaseTool {
         validator.validateNamespace(namespace);
       }
 
-      logger.info(`Describing ${resource}: ${name}`, { resource, name, namespace });
+      logger.info(`Describing ${resource}: ${name}`, { resource, name, namespace, cluster });
 
       // Build kubectl describe command
       let args = ['describe', resource, name];
@@ -64,8 +75,8 @@ export class KubectlDescribeTool extends BaseTool {
         args.push('-n', namespace);
       }
 
-      // Execute kubectl describe
-      const output = await kubectl.execute(args);
+      // Execute kubectl describe with cluster support
+      const output = await kubectl.execute(args, cluster);
 
       // Format output
       const formattedOutput = this.formatDescribeOutput(resource, name, namespace, output);

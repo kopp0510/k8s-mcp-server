@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlTopPodsTool extends BaseTool {
   constructor() {
@@ -34,6 +35,12 @@ export class KubectlTopPodsTool extends BaseTool {
           containers: {
             type: 'boolean',
             description: 'Show container-level resource usage'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -43,19 +50,24 @@ export class KubectlTopPodsTool extends BaseTool {
 
   async execute(args) {
     try {
-      const { namespace = 'default', allNamespaces, sortBy, containers } = args;
+      const { namespace = 'default', allNamespaces, sortBy, containers, cluster } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
 
       // Check if metrics-server is installed and running
-      await this.checkMetricsServer();
+      await this.checkMetricsServer(cluster);
 
       // Build kubectl top pods command
       const command = this.buildTopCommand(namespace, allNamespaces, sortBy, containers);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       // Format output
       const formattedResult = this.formatTopOutput(result, allNamespaces, containers);
@@ -79,11 +91,11 @@ export class KubectlTopPodsTool extends BaseTool {
     }
   }
 
-  async checkMetricsServer() {
+  async checkMetricsServer(cluster) {
     try {
       // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await kubectl.execute(checkCommand);
+      const result = await kubectl.execute(checkCommand, cluster);
 
       const deployment = JSON.parse(result);
 
@@ -198,7 +210,10 @@ export class KubectlTopPodsTool extends BaseTool {
       formatted += `• Data from the specified namespace only\n`;
     }
 
-    formatted += `\nNote: Data provided by metrics-server, may have slight delay\n`;
+    formatted += `\nTips:\n`;
+    formatted += `• Use sortBy parameter to sort by cpu or memory\n`;
+    formatted += `• Use containers=true to view container-level resource usage\n`;
+    formatted += `• Use kubectl_top_containers for more detailed container analysis`;
 
     return formatted;
   }

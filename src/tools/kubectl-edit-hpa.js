@@ -47,6 +47,12 @@ export class KubectlEditHpaTool extends BaseTool {
             description: 'Wait timeout in seconds (default: 120)',
             minimum: 30,
             maximum: 600
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['hpaName'],
@@ -66,8 +72,14 @@ export class KubectlEditHpaTool extends BaseTool {
         maxReplicas,
         namespace = 'default',
         wait = false,
-        timeout = 120
+        timeout = 120,
+        cluster
       } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Additional business logic validation (following security requirements)
       if (minReplicas !== undefined) {
@@ -94,7 +106,7 @@ export class KubectlEditHpaTool extends BaseTool {
       }
 
       // Check if HPA exists and get current state
-      const beforeState = await this.getHpaState(hpaName, namespace);
+      const beforeState = await this.getHpaState(hpaName, namespace, cluster);
 
       // Validate if new range is reasonable
       const newMinReplicas = minReplicas !== undefined ? minReplicas : beforeState.minReplicas;
@@ -110,16 +122,16 @@ export class KubectlEditHpaTool extends BaseTool {
       }
 
       // Execute HPA edit operation
-      await this.editHpa(hpaName, namespace, newMinReplicas, newMaxReplicas, beforeState.minReplicas, beforeState.maxReplicas);
+      await this.editHpa(hpaName, namespace, newMinReplicas, newMaxReplicas, beforeState.minReplicas, beforeState.maxReplicas, cluster);
 
       // If wait is needed, wait for HPA status update
       let afterState;
       if (wait) {
-        afterState = await this.waitForHpaUpdate(hpaName, namespace, timeout, newMinReplicas, newMaxReplicas);
+        afterState = await this.waitForHpaUpdate(hpaName, namespace, timeout, newMinReplicas, newMaxReplicas, cluster);
       } else {
         // Brief wait then get status
         await this.sleep(2000);
-        afterState = await this.getHpaState(hpaName, namespace);
+        afterState = await this.getHpaState(hpaName, namespace, cluster);
       }
 
       // Format final result
@@ -137,10 +149,10 @@ export class KubectlEditHpaTool extends BaseTool {
     }
   }
 
-  async getHpaState(hpaName, namespace) {
+  async getHpaState(hpaName, namespace, cluster) {
     try {
       const command = ['get', 'hpa', hpaName, '-n', namespace, '-o', 'json'];
-      const result = await kubectl.execute(command);
+      const result = await kubectl.execute(command, cluster);
 
       const hpa = JSON.parse(result);
 
@@ -166,7 +178,7 @@ export class KubectlEditHpaTool extends BaseTool {
     }
   }
 
-  async editHpa(hpaName, namespace, minReplicas, maxReplicas, originalMinReplicas, originalMaxReplicas) {
+  async editHpa(hpaName, namespace, minReplicas, maxReplicas, originalMinReplicas, originalMaxReplicas, cluster) {
     try {
       // Use temporary file method to avoid JSON quote issues in shell
       // Following k8s-mcp-server security specification, use --patch-file option
@@ -195,14 +207,14 @@ export class KubectlEditHpaTool extends BaseTool {
 
         // Use --patch-file parameter to avoid command line JSON quote issues
         const command = ['patch', 'hpa', hpaName, '-n', namespace, '--patch-file', tempFile, '--type', 'strategic'];
-        await kubectl.execute(command);
+        await kubectl.execute(command, cluster);
 
       } finally {
         // Always clean up temporary file
         try {
           await fs.unlink(tempFile);
-        } catch (cleanupError) {
-          // Ignore cleanup errors, don't affect main operation
+        } catch (unlinkError) {
+          // Ignore cleanup errors
         }
       }
 
@@ -211,31 +223,30 @@ export class KubectlEditHpaTool extends BaseTool {
     }
   }
 
-  async waitForHpaUpdate(hpaName, namespace, timeout, expectedMinReplicas, expectedMaxReplicas) {
+  async waitForHpaUpdate(hpaName, namespace, timeout, expectedMinReplicas, expectedMaxReplicas, cluster) {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const state = await this.getHpaState(hpaName, namespace);
+        const state = await this.getHpaState(hpaName, namespace, cluster);
 
-        // Check if updated to expected value
-        if (state.minReplicas === expectedMinReplicas &&
-            state.maxReplicas === expectedMaxReplicas &&
-            state.observedGeneration >= state.generation) {
+        // Check if HPA update is complete
+        // Check spec values
+        if (state.minReplicas === expectedMinReplicas && state.maxReplicas === expectedMaxReplicas) {
           return state;
         }
 
-        // Wait 2 seconds then retry
+        // Wait 2 seconds before retry
         await this.sleep(2000);
       } catch (error) {
-        // If getting status fails, wait a bit then retry
+        // If getting status fails, wait before retry
         await this.sleep(3000);
       }
     }
 
     // Timeout, get final status
-    const finalState = await this.getHpaState(hpaName, namespace);
+    const finalState = await this.getHpaState(hpaName, namespace, cluster);
     finalState.timeout = true;
     return finalState;
   }

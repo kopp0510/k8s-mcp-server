@@ -1,0 +1,46 @@
+{
+  "_comments": {
+    "description": "K8s MCP Server 多叢集配置檔案",
+    "version": "1.0.1",
+    "last_updated": "2024-12-19",
+    "mount_path": "/app/config/clusters.json",
+    "usage_rules": [
+      "此檔案透過 Docker volume mount 方式載入容器",
+      "修改此檔案後需重啟容器才會生效",
+      "叢集 ID 必須是唯一的，不能重複",
+      "local 類型叢集使用現有的 kubeconfig 檔案",
+      "gke 類型叢集需要 service account key 檔案",
+      "預設叢集必須在 clusters 區塊中存在",
+      "所有路徑都是容器內的絕對路徑"
+    ],
+    "security_notes": [
+      "GKE service account key 檔案包含敏感資訊，請妥善保管",
+      "建議使用最小權限原則的 service account",
+      "kubeconfig 和 key 檔案都應該唯讀掛載",
+      "不要將此檔案提交到版本控制系統"
+    ],
+    "docker_mount_examples": [
+      "叢集配置: -v /host/path/clusters.json:/app/config/clusters.json:ro",
+      "地端 kubeconfig: -v ~/.kube/config:/home/nodejs/.kube/config:ro",
+      "GKE service account: -v /host/secrets:/secrets:ro"
+    ]
+  },
+  "clusters": {
+    "docker-desktop": {
+      "name": "Docker Desktop",
+      "type": "local",
+      "description": "Docker Desktop 本地 Kubernetes 叢集",
+      "kubeconfig": "/home/nodejs/.kube/config",
+      "context": "docker-desktop",
+      "_notes": "本地開發環境，使用 Docker Desktop"
+    }
+  },
+  "default": "docker-desktop",
+  "configuration": {
+    "gke_auth_timeout": 300,
+    "kubectl_timeout": 30,
+    "helm_timeout": 60,
+    "auto_refresh_credentials": true,
+    "_notes": "全域設定項目，控制超時時間和認證行為"
+  }
+}

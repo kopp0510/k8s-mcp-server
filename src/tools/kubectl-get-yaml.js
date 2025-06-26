@@ -4,6 +4,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlGetYamlTool extends BaseTool {
   constructor() {
@@ -38,6 +39,12 @@ export class KubectlGetYamlTool extends BaseTool {
           allNamespaces: {
             type: 'boolean',
             description: 'Whether to view resources from all namespaces'
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['resource']
@@ -47,7 +54,12 @@ export class KubectlGetYamlTool extends BaseTool {
 
   async execute(args) {
     try {
-      const { resource, name, namespace, allNamespaces } = args;
+      const { resource, name, namespace, allNamespaces, cluster } = args;
+
+      // 驗證叢集參數
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
 
       // Validate parameter combination
       this.validateParameterCombination(resource, namespace, allNamespaces);
@@ -55,8 +67,8 @@ export class KubectlGetYamlTool extends BaseTool {
       // Build kubectl command
       const command = this.buildKubectlCommand(resource, name, namespace, allNamespaces);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       return this.createResponse(result);
 
