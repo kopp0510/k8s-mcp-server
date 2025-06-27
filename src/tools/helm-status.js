@@ -41,6 +41,12 @@ export class HelmStatusTool extends BaseTool {
             type: 'boolean',
             description: 'Show Helm hooks (default: false)',
             default: false
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify cluster ID (optional, defaults to current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['releaseName']
@@ -57,8 +63,17 @@ export class HelmStatusTool extends BaseTool {
         namespace,
         revision,
         showResources = false,
-        showHooks = false
+        showHooks = false,
+        cluster
       } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites(args);
 
       // Build helm status command
       const command = this.buildHelmStatusCommand({
@@ -69,8 +84,8 @@ export class HelmStatusTool extends BaseTool {
         showHooks
       });
 
-      // Execute command
-      const output = await helm.execute(command);
+      // Execute command with cluster support
+      const output = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatStatusOutput(output, args);
@@ -80,6 +95,12 @@ export class HelmStatusTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(this.formatErrorMessage(error.message, args));
     }
   }

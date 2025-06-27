@@ -8,6 +8,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import express from 'express';
 import { z } from 'zod';
 import { logger } from './utils/logger.js';
+import { PrerequisiteError } from './tools/base-tool.js';
 
 // Import tool classes
 import { KubectlGetTool } from './tools/kubectl-get.js';
@@ -28,6 +29,10 @@ import { HelmStatusTool } from './tools/helm-status.js';
 import { HelmRepoListTool } from './tools/helm-repo-list.js';
 import { HelmGetValuesTool } from './tools/helm-get-values.js';
 import { HelmHistoryTool } from './tools/helm-history.js';
+
+// Import cluster management tools
+import { ClusterListTool } from './tools/cluster-list.js';
+import { GkeAuthTool } from './tools/gke-auth.js';
 
 /**
  * Create and configure MCP Server
@@ -58,6 +63,10 @@ function setupMCPServer() {
   const helmRepoListTool = new HelmRepoListTool();
   const helmGetValuesTool = new HelmGetValuesTool();
   const helmHistoryTool = new HelmHistoryTool();
+
+  // Initialize cluster management tool instances
+  const clusterListTool = new ClusterListTool();
+  const gkeAuthTool = new GkeAuthTool();
 
   // Register tools to MCP Server
   server.tool(
@@ -189,6 +198,23 @@ function setupMCPServer() {
     }
   );
 
+  // Register cluster management tools to MCP Server
+  server.tool(
+    clusterListTool.name,
+    clusterListTool.getDefinition().inputSchema,
+    async (args) => {
+      return await clusterListTool.execute(args);
+    }
+  );
+
+  server.tool(
+    gkeAuthTool.name,
+    gkeAuthTool.getDefinition().inputSchema,
+    async (args) => {
+      return await gkeAuthTool.execute(args);
+    }
+  );
+
   // Create available tools list
   const availableTools = [
     // Kubectl tools
@@ -208,7 +234,10 @@ function setupMCPServer() {
     helmStatusTool.getDefinition(),
     helmRepoListTool.getDefinition(),
     helmGetValuesTool.getDefinition(),
-    helmHistoryTool.getDefinition()
+    helmHistoryTool.getDefinition(),
+    // Cluster management tools
+    clusterListTool.getDefinition(),
+    gkeAuthTool.getDefinition()
   ];
 
   return {
@@ -232,7 +261,10 @@ function setupMCPServer() {
       helmStatusTool,
       helmRepoListTool,
       helmGetValuesTool,
-      helmHistoryTool
+      helmHistoryTool,
+      // Cluster management tools
+      clusterListTool,
+      gkeAuthTool
     }
   };
 }
@@ -245,7 +277,9 @@ function createMCPHandler(tools, availableTools) {
     // Kubectl tools
     kubectlGetTool, kubectlLogsTool, kubectlDescribeTool, kubectlClusterInfoTool, kubectlGetYamlTool, kubectlTopNodesTool, kubectlTopPodsTool, kubectlTopContainersTool, kubectlScaleDeploymentTool, kubectlRestartDeploymentTool, kubectlEditHpaTool,
     // Helm tools
-    helmListTool, helmStatusTool, helmRepoListTool, helmGetValuesTool, helmHistoryTool
+    helmListTool, helmStatusTool, helmRepoListTool, helmGetValuesTool, helmHistoryTool,
+    // Cluster management tools
+    clusterListTool, gkeAuthTool
   } = tools;
 
   return async (message) => {
@@ -319,6 +353,13 @@ function createMCPHandler(tools, availableTools) {
           case 'helm_history':
             result = await helmHistoryTool.execute(toolArgs);
             break;
+          // Cluster management tools
+          case 'cluster_list':
+            result = await clusterListTool.execute(toolArgs);
+            break;
+          case 'gke_auth':
+            result = await gkeAuthTool.execute(toolArgs);
+            break;
           default:
             throw new Error(`Unknown tool: ${toolName}`);
         }
@@ -360,6 +401,56 @@ function createMCPHandler(tools, availableTools) {
 
     } catch (error) {
       logger.error('MCP message processing failed:', error);
+
+      // 檢查是否為前置條件錯誤
+      if (error instanceof PrerequisiteError) {
+        logger.warn(`前置條件錯誤，轉換為工具回應傳給 AI agent`, {
+          errorType: 'PrerequisiteError',
+          cluster: error.cluster,
+          tool: error.tool,
+          willForwardToAgent: true
+        });
+
+        // 將前置條件錯誤轉換為成功的工具回應，讓 AI agent 能讀取處理
+        const prerequisiteErrorResponse = {
+          content: [{
+            type: 'text',
+            text: `錯誤: 前置條件檢查失敗\n\n` +
+                  `錯誤詳情:\n${error.message}\n\n` +
+                  `叢集: ${error.cluster || '未指定'}\n` +
+                  `工具: ${error.tool || '未知'}\n\n` +
+                  `建議動作:\n` +
+                  `1. 檢查叢集認證狀態\n` +
+                  `2. 執行必要的認證步驟\n` +
+                  `3. 重新執行操作\n\n` +
+                  `錯誤類型: PrerequisiteError\n` +
+                  `需要處理: 是`
+          }],
+          metadata: {
+            errorType: 'PrerequisiteError',
+            cluster: error.cluster,
+            tool: error.tool,
+            requiresAction: true,
+            suggestion: error.message
+          }
+        };
+
+        const response = {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: prerequisiteErrorResponse // 使用 result 而不是 error
+        };
+
+        logger.info(`前置條件錯誤已轉換為工具回應，AI agent 可以處理`, {
+          responseType: 'ToolResponse',
+          errorType: 'PrerequisiteError',
+          forwardedToAgent: true
+        });
+
+        return response;
+      }
+
+      // 一般執行錯誤
       return {
         jsonrpc: '2.0',
         id: message.id,

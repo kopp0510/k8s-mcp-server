@@ -297,6 +297,38 @@ class SimpleValidator {
       throw new Error(`Annotation key "${key}" contains invalid characters`);
     }
   }
+
+  /**
+   * Validate Cluster ID format
+   * Cluster ID is used as kubectl context name, and must conform to security specifications
+   */
+  validateClusterId(clusterId) {
+    if (!clusterId || typeof clusterId !== 'string') {
+      throw new Error('Cluster ID must be a non-empty string');
+    }
+
+    if (clusterId.length > 64) {
+      throw new Error('Cluster ID length cannot exceed 64 characters');
+    }
+
+    // Cluster ID format: letters, numbers, hyphens, underscores, dots
+    // No special characters allowed to prevent command injection
+    const clusterIdRegex = /^[a-zA-Z0-9]([a-zA-Z0-9._-]*[a-zA-Z0-9])?$/;
+    if (!clusterIdRegex.test(clusterId)) {
+      throw new Error('Cluster ID format invalid. Must start and end with letters or numbers, can contain letters, numbers, hyphens, underscores, dots');
+    }
+
+    // Check for consecutive special characters
+    if (clusterId.includes('--') || clusterId.includes('__') || clusterId.includes('..')) {
+      throw new Error('Cluster ID cannot contain consecutive special characters');
+    }
+
+    // Check reserved words
+    const reservedWords = ['default', 'system', 'admin', 'root', 'kubernetes', 'kube-system'];
+    if (reservedWords.includes(clusterId.toLowerCase())) {
+      throw new Error(`Cluster ID cannot use reserved word: ${clusterId}`);
+    }
+  }
 }
 
 export const validator = new SimpleValidator();

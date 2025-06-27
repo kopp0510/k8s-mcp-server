@@ -24,6 +24,12 @@ export class HelmRepoListTool extends BaseTool {
             description: 'Output format',
             enum: ['table', 'json', 'yaml'],
             default: 'table'
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -35,13 +41,21 @@ export class HelmRepoListTool extends BaseTool {
     try {
       validator.validateInput(args, this.getDefinition().inputSchema);
 
-      const { output = 'table' } = args;
+      const { output = 'table', cluster } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Build helm repo list command
       const command = this.buildHelmRepoListCommand(output);
 
-      // Execute command
-      const result = await helm.execute(command);
+      // Execute command with cluster support
+      const result = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatRepoListOutput(result, output);
@@ -51,6 +65,12 @@ export class HelmRepoListTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(this.formatErrorMessage(error.message));
     }
   }

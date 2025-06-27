@@ -23,6 +23,12 @@ export class KubectlTopNodesTool extends BaseTool {
             type: 'string',
             description: 'Sort method',
             enum: ['cpu', 'memory']
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -34,16 +40,24 @@ export class KubectlTopNodesTool extends BaseTool {
     try {
       validator.validateInput(args, this.getDefinition().inputSchema);
 
-      const { sortBy } = args;
+      const { sortBy, cluster } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites(args);
 
       // Check if metrics-server is installed and running
-      await this.checkMetricsServer();
+      await this.checkMetricsServer(cluster);
 
       // Build kubectl top nodes command
       const command = this.buildTopCommand(sortBy);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       // Format output
       const formattedResult = this.formatTopOutput(result);
@@ -53,15 +67,21 @@ export class KubectlTopNodesTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }
 
-  async checkMetricsServer() {
+  async checkMetricsServer(cluster) {
     try {
       // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await kubectl.execute(checkCommand);
+      const result = await kubectl.execute(checkCommand, cluster);
 
       const deployment = JSON.parse(result);
 

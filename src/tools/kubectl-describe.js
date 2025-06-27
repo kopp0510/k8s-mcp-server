@@ -31,6 +31,12 @@ export class KubectlDescribeTool extends BaseTool {
           namespace: {
             type: 'string',
             description: 'Namespace (for namespaced resources, defaults to default)'
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, defaults to the current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['resource', 'name']
@@ -38,13 +44,21 @@ export class KubectlDescribeTool extends BaseTool {
     };
   }
 
-  async execute({ resource, name, namespace = 'default' }) {
+  async execute({ resource, name, namespace = 'default', cluster }) {
     // Define namespaced resource types (moved to top of function to avoid scope issues)
     const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
 
     try {
       // Validate input
-      validator.validateInput({ resource, name, namespace });
+      validator.validateInput({ resource, name, namespace, cluster });
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate resource name
       validator.validateResourceName(name);
@@ -54,7 +68,7 @@ export class KubectlDescribeTool extends BaseTool {
         validator.validateNamespace(namespace);
       }
 
-      logger.info(`Describing ${resource}: ${name}`, { resource, name, namespace });
+      logger.info(`Describing ${resource}: ${name}`, { resource, name, namespace, cluster });
 
       // Build kubectl describe command
       let args = ['describe', resource, name];
@@ -64,8 +78,8 @@ export class KubectlDescribeTool extends BaseTool {
         args.push('-n', namespace);
       }
 
-      // Execute kubectl describe
-      const output = await kubectl.execute(args);
+      // Execute kubectl describe with cluster support
+      const output = await kubectl.execute(args, cluster);
 
       // Format output
       const formattedOutput = this.formatDescribeOutput(resource, name, namespace, output);
@@ -79,6 +93,11 @@ export class KubectlDescribeTool extends BaseTool {
 
     } catch (error) {
       logger.error(`kubectl describe failed: ${resource}/${name}`, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
 
       // Handle common errors
       let errorMessage = error.message || 'Unknown error';

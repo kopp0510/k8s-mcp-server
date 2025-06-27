@@ -9,6 +9,20 @@
 - **Kubernetes 整合** - 提供完整的 kubectl 工具存取
 - **Helm 支援** - 提供 Helm chart 和 release 管理功能
 - **模組化架構** - 清晰的入口點和伺服器分離設計
+- **錯誤處理機制** - 完整的前置條件檢查和錯誤穿透處理
+- **安全性保護** - 防止未認證狀態下執行危險操作
+- **資源監控** - 完整的資源使用監控功能
+- **標籤篩選** - 強大的標籤篩選和搜尋功能
+- **多資源支援** - 支援 19 種不同的 Kubernetes 資源類型
+
+## 版本資訊
+
+- **當前版本**: 2.1.3
+- **完成度**: 100%
+- **支援工具**: 16 個主要工具
+- **錯誤處理**: 全面完成重構
+- **認證機制**: GKE 叢集認證整合
+- **安全機制**: kubectl/helm 危險操作阻止
 
 ## 檔案結構
 
@@ -18,7 +32,7 @@ k8s-mcp-server/
 │   ├── index.js                   # 主程式入口，處理生命週期和參數解析
 │   ├── server.js                  # MCP + Express 整合，伺服器實現
 │   ├── tools/                     # 工具模組
-│   │   ├── base-tool.js           # 基底工具類別
+│   │   ├── base-tool.js           # 基底工具類別，包含前置條件檢查
 │   │   ├── kubectl-get.js         # 資源查詢工具 (支援標籤篩選)
 │   │   ├── kubectl-logs.js        # Pod 日誌查看工具
 │   │   ├── kubectl-describe.js    # 資源詳細描述工具
@@ -57,12 +71,16 @@ k8s-mcp-server/
   - 生命週期管理
   - 優雅關閉處理
   - 錯誤處理
+  - 前置條件檢查
+  - GKE 叢集認證
 
 - **`src/server.js`** - 伺服器實現，負責：
   - MCP Server 設定和工具註冊
   - Express 應用程式建立 (SSE 模式)
   - MCP 訊息處理
   - SSE 連接管理
+  - 錯誤穿透處理
+  - 安全性檢查
 
 ## 快速開始
 
@@ -2726,31 +2744,31 @@ npm start
 
 ## 開發計劃
 
-### 已完成 (16項工具)
+### 已完成功能 (16項)
 
 #### Kubernetes 工具 (11項)
-- [x] **kubectl_get** - 取得各種 Kubernetes 資源 (支援 19 種資源類型：pods, nodes, deployments, services, replicasets, daemonsets, statefulsets, jobs, cronjobs, configmaps, secrets, pv, pvc, ingress, hpa, namespaces, events, serviceaccounts, clusterroles, clusterrolebindings)
-- [x] **kubectl_logs** - 查看 Pod 日誌
-- [x] **kubectl_describe** - 描述各種資源的詳細資訊
-- [x] **kubectl_cluster_info** - 取得叢集資訊和服務端點
-- [x] **kubectl_get_yaml** - 取得資源 YAML 格式輸出
-- [x] **kubectl_top_nodes** - 查看 Node 資源使用情況（需要 metrics-server）
-- [x] **kubectl_top_pods** - 查看 Pod 資源使用情況（需要 metrics-server）
-- [x] **kubectl_top_containers** - 查看容器資源使用情況（需要 metrics-server）
-- [x] **kubectl_scale_deployment** - 擴縮 Deployment 副本數量
-- [x] **kubectl_restart_deployment** - 重啟 Deployment（滾動重啟）
-- [x] **kubectl_edit_hpa** - 編輯 HorizontalPodAutoscaler 副本數量範圍
+- [x] **kubectl_get** - 支援 19 種資源類型
+- [x] **kubectl_logs** - Pod 日誌查看
+- [x] **kubectl_describe** - 資源詳細描述
+- [x] **kubectl_cluster_info** - 叢集資訊查詢
+- [x] **kubectl_get_yaml** - YAML 格式輸出
+- [x] **kubectl_top_nodes** - 節點資源監控
+- [x] **kubectl_top_pods** - Pod 資源監控
+- [x] **kubectl_top_containers** - 容器資源監控
+- [x] **kubectl_scale_deployment** - Deployment 擴縮
+- [x] **kubectl_restart_deployment** - Deployment 重啟
+- [x] **kubectl_edit_hpa** - HPA 編輯
 
 #### Helm 工具 (5項)
-- [x] **Helm List** - 列出 Helm releases，支援多種篩選選項（包含 -A 參數）
-- [x] **Helm Status** - 查看 Helm release 的詳細狀態資訊
-- [x] **Helm Get Values** - 查看 Helm release 的配置值
-- [x] **Helm Repo List** - 列出已添加的 Helm chart repositories
-- [x] **Helm History** - 查看 Helm release 的部署歷史記錄
+- [x] **helm_list** - Release 列表
+- [x] **helm_status** - Release 狀態
+- [x] **helm_get_values** - Release 配置值
+- [x] **helm_repo_list** - Repository 列表
+- [x] **helm_history** - Release 歷史記錄
 
-### 未完成功能 (依分類整理)
+### 未來計劃 (4項)
 
-#### 操作類 (4項)
+#### 操作類工具
 - [ ] **Apply YAML** - 應用 YAML 配置
 - [ ] **Create Resource** - 創建資源
 - [ ] **Update Resource** - 更新資源
@@ -2762,16 +2780,258 @@ npm start
 - **總計**: 20項功能
 - **完成度**: 80%
 
-### 特色功能
-- **標籤篩選支援** - kubectl_get 工具支援 labelSelector 和 labels 參數
-- **多資源類型** - kubectl_get 支援 19 種不同的 Kubernetes 資源類型
-- **資源監控** - 完整的 top 命令支援 (nodes, pods, containers)
-- **部署管理** - 支援擴縮和重啟 Deployment
-- **HPA 管理** - 安全的 HPA 編輯功能
-- **Helm 整合** - 完整的 Helm 管理功能
-- **SSE 連接** - 專為 n8n 設計的即時通訊
-- **模組化架構** - 清晰的工具分離和基底類別設計
+## 貢獻指南
+
+### 開發環境設定
+
+1. **Fork 專案**
+2. **克隆專案**:
+   ```bash
+   git clone https://github.com/your-username/k8s-mcp-server.git
+   ```
+3. **安裝依賴**:
+   ```bash
+   cd k8s-mcp-server
+   npm install
+   ```
+4. **建立分支**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+### 程式碼風格
+
+- 使用 ESLint 和 Prettier 保持一致的程式碼風格
+- 遵循 JavaScript Standard Style
+- 使用 JSDoc 撰寫文件
+- 使用 TypeScript 型別註解
+- 保持函數簡潔，遵循單一職責原則
+
+### 提交規範
+
+- 使用語意化的提交訊息
+- 提交前執行測試
+- 更新相關文件
+- 添加必要的測試案例
+- 確保 CI/CD 檢查通過
+
+### 測試指南
+
+1. **執行測試**:
+   ```bash
+   npm test
+   ```
+
+2. **檢查程式碼風格**:
+   ```bash
+   npm run lint
+   ```
+
+3. **執行整合測試**:
+   ```bash
+   npm run test:integration
+   ```
+
+### 文件貢獻
+
+- 更新 README.md
+- 添加或更新 JSDoc 註解
+- 提供使用範例
+- 更新 API 文件
+- 添加錯誤處理說明
+
+### 提交 Pull Request
+
+1. 確保所有測試通過
+2. 更新相關文件
+3. 描述變更內容
+4. 關聯相關 Issue
+5. 等待審查回饋
 
 ## 授權
 
 MIT License - 詳見 LICENSE 檔案
+
+## 安裝
+
+### 前置需求
+
+- Node.js >= 16.0.0
+- kubectl >= 1.20.0
+- helm >= 3.0.0
+- 有效的 kubeconfig 配置
+- (選用) metrics-server 用於資源監控功能
+
+### 本地安裝
+
+```bash
+# 克隆專案
+git clone https://github.com/your-username/k8s-mcp-server.git
+
+# 進入專案目錄
+cd k8s-mcp-server
+
+# 安裝依賴
+npm install
+
+# 啟動伺服器 (SSE 模式)
+npm run start:http
+
+# 或啟動伺服器 (Stdio 模式)
+npm start
+```
+
+### Docker 安裝
+
+```bash
+# 建構映像
+./build.sh
+
+# 運行容器 (SSE 模式)
+docker run -d --name k8s-mcp-server \
+  -p 3001:3001 \
+  -v ~/.kube:/home/nodejs/.kube:ro \
+  your-registry/k8s-mcp-server:latest \
+  npm run start:http
+
+# 或運行容器 (Stdio 模式)
+docker run -i --rm \
+  -v ~/.kube:/home/nodejs/.kube:ro \
+  your-registry/k8s-mcp-server:latest \
+  npm start
+```
+
+### Kubernetes 部署
+
+```bash
+# 部署 MCP Server
+kubectl apply -f k8s/
+
+# 檢查部署狀態
+kubectl get pods -l app=k8s-mcp-server
+
+# 檢查服務端點
+kubectl get svc k8s-mcp-server-service
+```
+
+## 使用方式
+
+### 1. 健康檢查
+
+```bash
+# 檢查伺服器狀態
+curl http://localhost:3001/health
+```
+
+### 2. SSE 連接測試
+
+```bash
+# 測試 SSE 連接
+curl -N http://localhost:3001/sse
+```
+
+### 3. n8n 整合
+
+1. 在 n8n 中添加 MCP Client 節點
+2. 設定 MCP Server URL:
+   ```
+   http://localhost:3001/sse
+   ```
+3. 選擇所需的 Kubernetes 或 Helm 工具
+4. 設定工具參數並執行
+
+### 4. Cursor 編輯器整合
+
+1. 配置 `~/.cursor/mcp.json`:
+   ```json
+   {
+     "mcpServers": {
+       "k8s-mcp-server": {
+         "command": "node",
+         "args": ["/path/to/k8s-mcp-server/src/index.js"]
+       }
+     }
+   }
+   ```
+2. 重啟 Cursor 編輯器
+3. 在 MCP 面板中使用工具
+```
+
+## 工具說明
+
+### Kubernetes 工具
+
+#### 1. kubectl_get
+- **功能**: 取得 Kubernetes 資源
+- **支援資源**: pods, nodes, deployments, services 等 19 種資源類型
+- **特色**: 支援標籤篩選、命名空間過濾、格式化輸出
+- **使用場景**: 資源查詢、狀態監控、問題診斷
+
+#### 2. kubectl_logs
+- **功能**: 查看 Pod 日誌
+- **特色**: 支援容器選擇、時間範圍過濾、行數限制
+- **使用場景**: 應用程式除錯、日誌分析、問題追蹤
+
+#### 3. kubectl_describe
+- **功能**: 描述資源詳細資訊
+- **支援資源**: pod, node, service, deployment 等
+- **特色**: 完整的資源狀態和事件記錄
+- **使用場景**: 深入分析資源、故障排除
+
+#### 4. kubectl_cluster_info
+- **功能**: 查看叢集資訊
+- **特色**: 包含控制平面和核心服務端點
+- **使用場景**: 叢集狀態檢查、連接測試
+
+#### 5. kubectl_get_yaml
+- **功能**: 取得資源 YAML 格式輸出
+- **特色**: 支援多種資源類型、格式化輸出
+- **使用場景**: 配置檢查、資源備份、模板製作
+
+#### 6-8. kubectl_top 系列
+- **功能**: 資源使用監控 (nodes/pods/containers)
+- **特色**: 支援 CPU 和記憶體使用量監控
+- **前置需求**: 需要 metrics-server
+- **使用場景**: 效能監控、容量規劃、異常檢測
+
+#### 9. kubectl_scale_deployment
+- **功能**: 擴縮 Deployment 副本數量
+- **特色**: 支援等待完成、超時設定
+- **使用場景**: 負載調整、服務擴容、成本優化
+
+#### 10. kubectl_restart_deployment
+- **功能**: 重啟 Deployment (滾動更新)
+- **特色**: 零停機時間、支援等待完成
+- **使用場景**: 配置更新、映像更新、故障恢復
+
+#### 11. kubectl_edit_hpa
+- **功能**: 編輯 HPA 副本數量範圍
+- **特色**: 安全的參數驗證、支援等待完成
+- **使用場景**: 自動擴縮調整、效能優化
+
+### Helm 工具
+
+#### 1. helm_list
+- **功能**: 列出 Helm releases
+- **特色**: 支援多種篩選和排序選項
+- **使用場景**: Release 管理、狀態監控
+
+#### 2. helm_status
+- **功能**: 查看 release 狀態
+- **特色**: 詳細的部署資訊和資源狀態
+- **使用場景**: 部署驗證、問題診斷
+
+#### 3. helm_get_values
+- **功能**: 查看 release 配置值
+- **特色**: 支援多種輸出格式
+- **使用場景**: 配置檢查、值覆蓋驗證
+
+#### 4. helm_repo_list
+- **功能**: 列出 Helm repositories
+- **特色**: 支援多種輸出格式
+- **使用場景**: Repository 管理
+
+#### 5. helm_history
+- **功能**: 查看 release 部署歷史
+- **特色**: 完整的版本和變更記錄
+- **使用場景**: 版本追蹤、回滾準備

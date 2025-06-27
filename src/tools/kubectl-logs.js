@@ -48,6 +48,12 @@ export class KubectlLogsTool extends BaseTool {
             description: 'Whether to show logs from previous container instance (default false)',
             default: false,
           },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, defaults to the current cluster)',
+            minLength: 1,
+            maxLength: 64
+          }
         },
         required: ['pod'],
       },
@@ -65,8 +71,17 @@ export class KubectlLogsTool extends BaseTool {
         lines = 100,
         since,
         follow = false,
-        previous = false
+        previous = false,
+        cluster
       } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Security restriction: don't allow follow mode to avoid long-running processes
       if (follow) {
@@ -106,8 +121,8 @@ export class KubectlLogsTool extends BaseTool {
         kubectlArgs.push('--previous');
       }
 
-      // Execute command
-      const result = await kubectl.execute(kubectlArgs);
+      // Execute command with cluster support
+      const result = await kubectl.execute(kubectlArgs, cluster);
 
       // Format response
       const logInfo = {
@@ -140,6 +155,12 @@ ${result}`,
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }

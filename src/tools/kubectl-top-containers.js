@@ -39,6 +39,12 @@ export class KubectlTopContainersTool extends BaseTool {
           containerName: {
             type: 'string',
             description: 'Filter containers containing specific name (fuzzy matching)'
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: []
@@ -55,20 +61,29 @@ export class KubectlTopContainersTool extends BaseTool {
         allNamespaces,
         sortBy,
         podName,
-        containerName
+        containerName,
+        cluster
       } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
 
       // Check if metrics-server is installed and running
-      await this.checkMetricsServer();
+      await this.checkMetricsServer(cluster);
 
       // Build kubectl top pods --containers command
       const command = this.buildTopCommand(namespace, allNamespaces, sortBy);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       // Parse and filter container data
       const containerData = this.parseContainerData(result);
@@ -82,6 +97,11 @@ export class KubectlTopContainersTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
 
       // Check if it's a "no resources found" situation
       if (error.message.includes('No resources found')) {
@@ -99,11 +119,11 @@ export class KubectlTopContainersTool extends BaseTool {
     }
   }
 
-  async checkMetricsServer() {
+  async checkMetricsServer(cluster) {
     try {
       // Check if metrics-server deployment exists
       const checkCommand = ['get', 'deployment', 'metrics-server', '-n', 'kube-system', '-o', 'json'];
-      const result = await kubectl.execute(checkCommand);
+      const result = await kubectl.execute(checkCommand, cluster);
 
       const deployment = JSON.parse(result);
 

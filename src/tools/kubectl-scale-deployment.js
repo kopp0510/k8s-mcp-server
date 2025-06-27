@@ -5,6 +5,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlScaleDeploymentTool extends BaseTool {
   constructor() {
@@ -41,6 +42,12 @@ export class KubectlScaleDeploymentTool extends BaseTool {
             description: 'Wait timeout in seconds (default: 300)',
             minimum: 30,
             maximum: 1800
+          },
+          cluster: {
+            type: 'string',
+            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['deploymentName', 'replicas']
@@ -55,23 +62,32 @@ export class KubectlScaleDeploymentTool extends BaseTool {
         replicas,
         namespace = 'default',
         wait = false,
-        timeout = 300
+        timeout = 300,
+        cluster
       } = args;
 
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
+
       // Check if Deployment exists and get current state
-      const currentState = await this.getDeploymentState(deploymentName, namespace);
+      const currentState = await this.getDeploymentState(deploymentName, namespace, cluster);
 
       // Execute scaling operation
-      await this.scaleDeployment(deploymentName, replicas, namespace);
+      await this.scaleDeployment(deploymentName, replicas, namespace, cluster);
 
       // If wait is required, wait for scaling to complete
       let afterState;
       if (wait) {
-        afterState = await this.waitForScaleComplete(deploymentName, replicas, namespace, timeout);
+        afterState = await this.waitForScaleComplete(deploymentName, replicas, namespace, timeout, cluster);
       } else {
         // Brief wait then get state
         await this.sleep(2000);
-        afterState = await this.getDeploymentState(deploymentName, namespace);
+        afterState = await this.getDeploymentState(deploymentName, namespace, cluster);
       }
 
       // Format final result
@@ -80,14 +96,19 @@ export class KubectlScaleDeploymentTool extends BaseTool {
       return this.createResponse(result);
 
     } catch (error) {
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }
 
-  async getDeploymentState(deploymentName, namespace) {
+  async getDeploymentState(deploymentName, namespace, cluster) {
     try {
       const command = ['get', 'deployment', deploymentName, '-n', namespace, '-o', 'json'];
-      const result = await kubectl.execute(command);
+      const result = await kubectl.execute(command, cluster);
 
       const deployment = JSON.parse(result);
 
@@ -109,22 +130,22 @@ export class KubectlScaleDeploymentTool extends BaseTool {
     }
   }
 
-  async scaleDeployment(deploymentName, replicas, namespace) {
+  async scaleDeployment(deploymentName, replicas, namespace, cluster) {
     try {
       const command = ['scale', 'deployment', deploymentName, '--replicas', replicas.toString(), '-n', namespace];
-      await kubectl.execute(command);
+      await kubectl.execute(command, cluster);
     } catch (error) {
       throw new Error(`Failed to scale Deployment: ${error.message}`);
     }
   }
 
-  async waitForScaleComplete(deploymentName, targetReplicas, namespace, timeout) {
+  async waitForScaleComplete(deploymentName, targetReplicas, namespace, timeout, cluster) {
     const startTime = Date.now();
     const timeoutMs = timeout * 1000;
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        const state = await this.getDeploymentState(deploymentName, namespace);
+        const state = await this.getDeploymentState(deploymentName, namespace, cluster);
 
         // Check if target state is reached
         if (targetReplicas === 0) {
@@ -148,7 +169,7 @@ export class KubectlScaleDeploymentTool extends BaseTool {
     }
 
     // Timeout, get final state
-    const finalState = await this.getDeploymentState(deploymentName, namespace);
+    const finalState = await this.getDeploymentState(deploymentName, namespace, cluster);
     finalState.timeout = true;
     return finalState;
   }

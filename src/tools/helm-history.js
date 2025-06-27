@@ -40,6 +40,12 @@ export class HelmHistoryTool extends BaseTool {
             description: 'Output format (default: table)',
             enum: ['table', 'json', 'yaml'],
             default: 'table'
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['releaseName']
@@ -55,8 +61,17 @@ export class HelmHistoryTool extends BaseTool {
         releaseName,
         namespace,
         max = 256,
-        output = 'table'
+        output = 'table',
+        cluster
       } = args;
+
+      // Validate cluster parameters
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate release name
       if (!releaseName || releaseName.trim() === '') {
@@ -77,8 +92,8 @@ export class HelmHistoryTool extends BaseTool {
         finalCommand: `helm ${command.join(' ')}`
       });
 
-      // Execute command
-      const helmOutput = await helm.execute(command);
+      // Execute command with cluster support
+      const helmOutput = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatHistoryOutput(helmOutput, args);
@@ -88,6 +103,12 @@ export class HelmHistoryTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }
@@ -198,16 +219,18 @@ export class HelmHistoryTool extends BaseTool {
 
     let header = `Helm Release History`;
     header += '\n' + '='.repeat(50);
-    header += `\n\n• Release name: ${releaseName}`;
+    header += '\n';
+    header += `\n**Release Information:**`;
+    header += `\n• Name: ${releaseName}`;
+
     if (namespace) {
       header += `\n• Namespace: ${namespace}`;
+    } else {
+      header += `\n• Namespace: (default namespace)`;
     }
-    if (max && max !== 256) {
-      header += `\n• Maximum records: ${max}`;
-    }
-    if (output && output !== 'table') {
-      header += `\n• Output format: ${output.toUpperCase()}`;
-    }
+
+    header += `\n• Maximum records: ${max}`;
+    header += `\n• Output format: ${output.toUpperCase()}`;
 
     return header;
   }

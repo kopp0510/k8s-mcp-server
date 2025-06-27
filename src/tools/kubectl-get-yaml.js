@@ -4,6 +4,7 @@
 
 import { BaseTool } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
+import { validator } from '../utils/validator.js';
 
 export class KubectlGetYamlTool extends BaseTool {
   constructor() {
@@ -38,6 +39,12 @@ export class KubectlGetYamlTool extends BaseTool {
           allNamespaces: {
             type: 'boolean',
             description: 'Whether to view resources from all namespaces'
+          },
+          cluster: {
+            type: 'string',
+            description: 'Specify the cluster ID (optional, default to the current cluster)',
+            minLength: 1,
+            maxLength: 64
           }
         },
         required: ['resource']
@@ -47,7 +54,15 @@ export class KubectlGetYamlTool extends BaseTool {
 
   async execute(args) {
     try {
-      const { resource, name, namespace, allNamespaces } = args;
+      const { resource, name, namespace, allNamespaces, cluster } = args;
+
+      // Validate cluster parameter
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate parameter combination
       this.validateParameterCombination(resource, namespace, allNamespaces);
@@ -55,12 +70,17 @@ export class KubectlGetYamlTool extends BaseTool {
       // Build kubectl command
       const command = this.buildKubectlCommand(resource, name, namespace, allNamespaces);
 
-      // Execute command
-      const result = await kubectl.execute(command);
+      // Execute command with cluster support
+      const result = await kubectl.execute(command, cluster);
 
       return this.createResponse(result);
 
     } catch (error) {
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }

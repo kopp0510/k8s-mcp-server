@@ -59,6 +59,10 @@ export class HelmListTool extends BaseTool {
             minimum: 1,
             maximum: 1000,
             default: 256
+          },
+          cluster: {
+            type: 'string',
+            description: 'Target cluster ID (optional, uses default cluster if not specified)',
           }
         },
         required: []
@@ -78,8 +82,17 @@ export class HelmListTool extends BaseTool {
         short = false,
         date = true,
         reverse = false,
-        max = 256
+        max = 256,
+        cluster
       } = args;
+
+      // Validate cluster ID (if provided)
+      if (cluster) {
+        validator.validateClusterId(cluster);
+      }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate parameter combination - only check conflicts when allNamespaces is explicitly set
       if (namespace && args.allNamespaces === true) {
@@ -110,8 +123,8 @@ export class HelmListTool extends BaseTool {
         finalCommand: `helm ${command.join(' ')}`
       });
 
-      // Execute command
-      const output = await helm.execute(command);
+      // Execute command (pass cluster parameter)
+      const output = await helm.execute(command, cluster);
 
       // Format output
       const formattedOutput = this.formatListOutput(output, {
@@ -124,6 +137,12 @@ export class HelmListTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }
