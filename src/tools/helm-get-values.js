@@ -45,7 +45,7 @@ export class HelmGetValuesTool extends BaseTool {
           },
           cluster: {
             type: 'string',
-            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            description: 'Specify cluster ID (optional, defaults to current cluster)',
             minLength: 1,
             maxLength: 64
           }
@@ -68,10 +68,13 @@ export class HelmGetValuesTool extends BaseTool {
         cluster
       } = args;
 
-      // 驗證叢集參數
+      // Validate cluster parameter
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Build helm get values command
       const command = this.buildHelmGetValuesCommand({
@@ -93,6 +96,12 @@ export class HelmGetValuesTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(this.formatErrorMessage(error.message, args));
     }
   }
@@ -208,10 +217,8 @@ export class HelmGetValuesTool extends BaseTool {
       result += `• Use helm_history to view available revisions\n`;
       result += `• Don't specify revision parameter to view latest version\n`;
       result += `• Check if the revision number is correct\n`;
-
       return result;
     }
-
     return errorMessage;
   }
 }

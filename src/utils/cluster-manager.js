@@ -1,6 +1,6 @@
 /**
- * Cluster Manager - 多叢集管理工具
- * 負責載入叢集配置、GKE 認證和叢集切換
+ * Cluster Manager - Multi-Cluster Management Tool
+ * Responsible for loading cluster configuration, GKE authentication, and cluster switching
  */
 
 import fs from 'fs';
@@ -19,13 +19,13 @@ export class ClusterManager {
   }
 
   /**
-   * 載入叢集配置檔案
+   * Load cluster configuration file
    */
   loadClusters() {
     try {
       if (!fs.existsSync(this.configPath)) {
         logger.warn(`Cluster configuration file not found: ${this.configPath}`);
-        // 建立預設配置
+        // Create default configuration
         this.clusters = this.getDefaultConfig();
         return;
       }
@@ -33,7 +33,7 @@ export class ClusterManager {
       const data = fs.readFileSync(this.configPath, 'utf8');
       this.clusters = JSON.parse(data);
 
-      // 驗證配置檔案結構
+      // Validate configuration file structure
       this.validateConfig();
 
       logger.info('Cluster configuration loaded successfully', {
@@ -47,7 +47,7 @@ export class ClusterManager {
   }
 
   /**
-   * 驗證配置檔案結構
+   * Validate configuration file structure
    */
   validateConfig() {
     if (!this.clusters.clusters || typeof this.clusters.clusters !== 'object') {
@@ -58,14 +58,14 @@ export class ClusterManager {
       throw new Error(`Invalid configuration: default cluster '${this.clusters.default}' not found`);
     }
 
-    // 驗證每個叢集配置
+    // Validate each cluster configuration
     for (const [id, cluster] of Object.entries(this.clusters.clusters)) {
       this.validateClusterConfig(id, cluster);
     }
   }
 
   /**
-   * 驗證單個叢集配置
+   * Validate single cluster configuration
    */
   validateClusterConfig(id, cluster) {
     const required = ['name', 'type', 'description'];
@@ -92,7 +92,7 @@ export class ClusterManager {
   }
 
   /**
-   * 取得預設配置（當配置檔案不存在時）
+   * Get default configuration (when configuration file does not exist)
    */
   getDefaultConfig() {
     return {
@@ -100,7 +100,7 @@ export class ClusterManager {
         local: {
           name: "Local Kubernetes",
           type: "local",
-          description: "地端 Kubernetes 叢集",
+          description: "Local Kubernetes cluster",
           kubeconfig: "/home/nodejs/.kube/config"
         }
       },
@@ -115,14 +115,14 @@ export class ClusterManager {
   }
 
   /**
-   * 取得所有叢集
+   * Get all clusters
    */
   getClusters() {
     return this.clusters.clusters;
   }
 
   /**
-   * 取得特定叢集配置
+   * Get specific cluster configuration
    */
   getCluster(clusterName) {
     if (!clusterName) {
@@ -138,7 +138,7 @@ export class ClusterManager {
   }
 
   /**
-   * 取得可用的叢集列表
+   * Get available cluster list
    */
   getAvailableClusters() {
     const clusters = this.getClusters();
@@ -149,26 +149,29 @@ export class ClusterManager {
   }
 
   /**
-   * 取得預設叢集
+   * Get default cluster
    */
   getDefaultCluster() {
     return this.getCluster(this.clusters.default);
   }
 
   /**
-   * 檢查叢集是否存在
+   * Check if cluster exists
    */
   clusterExists(clusterName) {
     return !!this.clusters.clusters[clusterName];
   }
 
   /**
-   * GKE 叢集認證
+   * GKE cluster authentication
    */
   async authenticateGKE(cluster) {
     if (cluster.type !== 'gke') {
       return;
     }
+
+    // Correct: Explicitly declare kubeconfigPath
+    const kubeconfigPath = '/home/nodejs/.kube/config';
 
     logger.info(`Starting GKE authentication for cluster: ${cluster.name}`, {
       project: cluster.project,
@@ -177,12 +180,12 @@ export class ClusterManager {
     });
 
     try {
-      // 檢查 service account key 檔案是否存在
+      // Check if service account key file exists
       if (!fs.existsSync(cluster.keyFile)) {
         throw new Error(`Service account key file not found: ${cluster.keyFile}`);
       }
 
-      // 1. Service account 認證
+      // 1. Service account authentication
       logger.debug('Activating service account');
       await this.executeCommand('gcloud', [
         'auth', 'activate-service-account',
@@ -190,7 +193,7 @@ export class ClusterManager {
         '--quiet'
       ]);
 
-      // 2. 取得叢集 credentials
+      // 2. Get cluster credentials
       logger.debug('Getting cluster credentials');
       await this.executeCommand('gcloud', [
         'container', 'clusters', 'get-credentials',
@@ -200,9 +203,32 @@ export class ClusterManager {
         '--quiet'
       ]);
 
-      // 3. 驗證連線
-      logger.debug('Verifying cluster connection');
-      await this.executeCommand('kubectl', ['cluster-info', '--request-timeout=10s']);
+      // 3. Switch to GKE context
+      const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
+      logger.debug(`Switching to GKE context: ${contextName}`);
+      await this.executeCommand('kubectl', [
+        'config', 'use-context', contextName,
+        '--kubeconfig', kubeconfigPath
+      ]);
+
+      // 4. Verify kubeconfig state and connection
+      logger.debug('Checking kubeconfig state and verifying connection');
+      try {
+        // Check current context
+        const currentContext = await this.executeCommand('kubectl', ['config', 'current-context', '--kubeconfig', kubeconfigPath]);
+        logger.debug(`Current kubectl context: ${currentContext}`);
+
+        // Check all available contexts
+        const allContexts = await this.executeCommand('kubectl', ['config', 'get-contexts', '--no-headers', '--kubeconfig', kubeconfigPath]);
+        logger.debug(`Available contexts:\n${allContexts}`);
+
+        // Verify connection
+        await this.executeCommand('kubectl', ['cluster-info', '--request-timeout=10s', '--kubeconfig', kubeconfigPath]);
+        logger.debug('Cluster connection verified successfully');
+      } catch (verifyError) {
+        logger.warn(`Verification failed: ${verifyError.message}`);
+        throw verifyError;
+      }
 
       this.currentCluster = cluster.id;
 
@@ -223,7 +249,7 @@ export class ClusterManager {
   }
 
   /**
-   * 切換到指定叢集
+   * Switch to specified cluster
    */
   async switchToCluster(clusterName) {
     const cluster = this.getCluster(clusterName);
@@ -237,12 +263,12 @@ export class ClusterManager {
       if (cluster.type === 'gke') {
         await this.authenticateGKE(cluster);
       } else if (cluster.type === 'local') {
-        // 對於 local 類型，檢查 kubeconfig 是否存在
+        // For local type, check if kubeconfig exists
         if (!fs.existsSync(cluster.kubeconfig)) {
           throw new Error(`Kubeconfig file not found: ${cluster.kubeconfig}`);
         }
 
-        // 如果有指定 context，切換到該 context
+        // If specified context, switch to that context
         if (cluster.context) {
           await this.executeCommand('kubectl', [
             'config', 'use-context', cluster.context,
@@ -263,14 +289,14 @@ export class ClusterManager {
   }
 
   /**
-   * 取得目前使用的叢集
+   * Get currently used cluster
    */
   getCurrentCluster() {
     return this.currentCluster || this.clusters.default;
   }
 
   /**
-   * 執行系統指令
+   * Execute system command
    */
   async executeCommand(command, args, options = {}) {
     const timeout = options.timeout || this.clusters.configuration?.gke_auth_timeout || 300;
@@ -313,7 +339,7 @@ export class ClusterManager {
         reject(error);
       });
 
-      // 設定超時
+      // Set timeout
       const timer = setTimeout(() => {
         process.kill('SIGTERM');
         reject(new Error(`Command timeout after ${timeout}s: ${command}`));
@@ -326,7 +352,7 @@ export class ClusterManager {
   }
 
   /**
-   * 重新載入配置檔案
+   * Reload configuration file
    */
   reloadConfig() {
     logger.info('Reloading cluster configuration');
@@ -334,7 +360,7 @@ export class ClusterManager {
   }
 
   /**
-   * 取得配置檔案統計資訊
+   * Get configuration file statistics
    */
   getStats() {
     const clusters = this.getClusters();
@@ -352,7 +378,107 @@ export class ClusterManager {
       configPath: this.configPath
     };
   }
+
+  /**
+   * Check if GKE cluster is authenticated
+   * @param {string} clusterId - Cluster ID
+   * @returns {Promise<boolean>} Whether authenticated
+   */
+  async isGkeClusterAuthenticated(clusterId) {
+    try {
+      const cluster = this.getCluster(clusterId);
+
+      if (cluster.type !== 'gke') {
+        return true; // Non-GKE cluster does not need to check
+      }
+
+      // Use the same kubeconfig path as when authenticating
+      const kubeconfigPath = '/home/nodejs/.kube/config';
+      const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
+
+      logger.debug(`Checking GKE cluster authentication for: ${clusterId}`);
+
+      // Check if kubeconfig file exists
+      if (!fs.existsSync(kubeconfigPath)) {
+        logger.debug(`Kubeconfig file not found: ${kubeconfigPath}`);
+        return false;
+      }
+
+      // Method 1: Directly test using specified context to connect to cluster
+      try {
+        await this.executeCommand('kubectl', [
+          'cluster-info',
+          '--request-timeout=5s',
+          '--context', contextName,
+          '--kubeconfig', kubeconfigPath
+        ], { timeout: 10 });
+        logger.debug(`GKE cluster ${clusterId} authenticated via direct context test`);
+        return true;
+      } catch (directError) {
+        logger.debug(`Direct context test failed for ${clusterId}: ${directError.message}`);
+      }
+
+      // Method 2: Check if context exists in kubeconfig
+      try {
+        const allContexts = await this.executeCommand('kubectl', ['config', 'get-contexts', '--no-headers', '--kubeconfig', kubeconfigPath], { timeout: 10 });
+        const hasGkeContext = allContexts.split('\n').some(line => line.includes(contextName));
+
+        if (hasGkeContext) {
+          logger.debug(`GKE cluster ${clusterId} context found in kubeconfig`);
+          return true;
+        } else {
+          logger.debug(`GKE cluster ${clusterId} context not found in kubeconfig`);
+        }
+      } catch (listError) {
+        logger.debug(`Context list check failed for ${clusterId}: ${listError.message}`);
+      }
+
+      return false;
+    } catch (error) {
+      logger.debug(`GKE cluster ${clusterId} authentication check failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Validate cluster operation prerequisites
+   * @param {string} clusterId - Cluster ID
+   * @throws {Error} If prerequisites are not met
+   */
+  async validateClusterPrerequisites(clusterId) {
+    if (!clusterId) {
+      return; // Use default cluster
+    }
+
+    // Check if cluster configuration exists
+    if (!this.clusterExists(clusterId)) {
+      throw new Error(`Cluster '${clusterId}' does not exist in configuration. Please check clusters.json setting.`);
+    }
+
+    const cluster = this.getCluster(clusterId);
+
+    // Check GKE cluster authentication
+    if (cluster.type === 'gke') {
+      const isAuthenticated = await this.isGkeClusterAuthenticated(clusterId);
+
+      if (!isAuthenticated) {
+        throw new Error(
+          `GKE cluster '${clusterId}' is not authenticated.\n\n` +
+          `Please run authentication command first:\n` +
+          `{"tool": "gke_auth", "params": {"cluster": "${clusterId}"}}\n\n` +
+          `After authentication is successful, please re-run your command.`
+        );
+      }
+    }
+
+    // Check local cluster kubeconfig file
+    if (cluster.type === 'local') {
+      if (!fs.existsSync(cluster.kubeconfig)) {
+        throw new Error(`Local cluster '${clusterId}' kubeconfig file does not exist: ${cluster.kubeconfig}`);
+      }
+    }
+  }
 }
 
-// 建立單例實例
+// Create singleton instance
 export const clusterManager = new ClusterManager();

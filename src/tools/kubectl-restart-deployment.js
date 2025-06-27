@@ -64,6 +64,9 @@ export class KubectlRestartDeploymentTool extends BaseTool {
         validator.validateClusterId(cluster);
       }
 
+      // 🔥 新增：前置條件檢查
+      await this.validatePrerequisites({ cluster });
+
       // Check if Deployment exists and get current state
       const beforeState = await this.getDeploymentState(deploymentName, namespace, cluster);
 
@@ -86,6 +89,11 @@ export class KubectlRestartDeploymentTool extends BaseTool {
       return this.createResponse(result);
 
     } catch (error) {
+      // 如果是前置條件錯誤，直接重新拋出，讓 MCP 處理器處理
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }

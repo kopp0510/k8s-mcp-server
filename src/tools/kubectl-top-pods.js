@@ -38,7 +38,7 @@ export class KubectlTopPodsTool extends BaseTool {
           },
           cluster: {
             type: 'string',
-            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
             minLength: 1,
             maxLength: 64
           }
@@ -52,10 +52,13 @@ export class KubectlTopPodsTool extends BaseTool {
     try {
       const { namespace = 'default', allNamespaces, sortBy, containers, cluster } = args;
 
-      // 驗證叢集參數
+      // Validate cluster parameter
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate parameter combination
       this.validateParameterCombination(namespace, allNamespaces);
@@ -79,6 +82,11 @@ export class KubectlTopPodsTool extends BaseTool {
       if (error.message.includes('No resources found')) {
         const namespaceInfo = allNamespaces ? 'all namespaces' : `namespace "${namespace}"`;
         return this.createResponse(`No running Pods found in ${namespaceInfo}.\n\nTips:\n• Ensure there are running Pods in the specified namespace\n• Use kubectl_get to view Pod list: {"resource": "pods", "namespace": "${namespace}"}\n• For new clusters, you may need to deploy some applications first`);
+      }
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
       }
 
       return this.createErrorResponse(error.message);

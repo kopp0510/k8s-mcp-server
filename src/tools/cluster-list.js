@@ -1,6 +1,6 @@
 /**
  * Cluster List Tool
- * 列出所有可用的 Kubernetes 叢集
+ * List all available Kubernetes clusters with their configurations and status
  */
 
 import { BaseTool } from './base-tool.js';
@@ -39,7 +39,7 @@ export class ClusterListTool extends BaseTool {
     try {
       const { format = 'detailed', includeStats = false } = args;
 
-      // 驗證輸入
+      // Validate input
       this.validateInput(args);
 
       const clusters = clusterManager.getClusters();
@@ -84,13 +84,13 @@ export class ClusterListTool extends BaseTool {
   }
 
   /**
-   * 格式化詳細輸出
+   * Format detailed output
    */
   formatDetailedOutput(clusters, defaultCluster, currentCluster, stats) {
     let result = 'Available Kubernetes Clusters\n';
     result += '='.repeat(50) + '\n\n';
 
-    // 叢集列表
+    // Cluster list
     for (const [id, cluster] of Object.entries(clusters)) {
       const isDefault = id === defaultCluster;
       const isCurrent = id === currentCluster;
@@ -124,12 +124,12 @@ export class ClusterListTool extends BaseTool {
       result += '\n';
     }
 
-    // 統計資訊
+    // Statistics section
     if (stats) {
       result += this.formatStatsSection(stats);
     }
 
-    // 使用說明
+    // Usage guidelines
     result += `**Usage Guidelines:**\n`;
     result += `• All kubectl and helm tools support optional 'cluster' parameter\n`;
     result += `• For GKE clusters, authentication happens automatically when switching\n`;
@@ -151,17 +151,17 @@ export class ClusterListTool extends BaseTool {
   }
 
   /**
-   * 格式化表格輸出
+   * Format table output
    */
   formatTableOutput(clusters, defaultCluster, currentCluster, stats) {
     let result = 'Kubernetes Clusters Summary\n';
     result += '='.repeat(50) + '\n\n';
 
-    // 表格標題
+    // Table header
     result += 'ID'.padEnd(20) + 'Name'.padEnd(25) + 'Type'.padEnd(8) + 'Status\n';
     result += '-'.repeat(20) + '-'.repeat(25) + '-'.repeat(8) + '-'.repeat(15) + '\n';
 
-    // 表格內容
+    // Table content
     for (const [id, cluster] of Object.entries(clusters)) {
       const isDefault = id === defaultCluster;
       const isCurrent = id === currentCluster;
@@ -185,7 +185,7 @@ export class ClusterListTool extends BaseTool {
 
     result += '\n';
 
-    // 統計資訊
+    // Statistics section
     if (stats) {
       result += this.formatStatsSection(stats);
     }
@@ -200,7 +200,7 @@ export class ClusterListTool extends BaseTool {
   }
 
   /**
-   * 格式化 JSON 輸出
+   * Format JSON output
    */
   formatJsonOutput(clusters, defaultCluster, currentCluster, stats) {
     const result = {
@@ -212,7 +212,7 @@ export class ClusterListTool extends BaseTool {
       }
     };
 
-    // 處理叢集資訊
+    // Process cluster information
     for (const [id, cluster] of Object.entries(clusters)) {
       result.clusters[id] = {
         ...cluster,
@@ -222,7 +222,7 @@ export class ClusterListTool extends BaseTool {
       };
     }
 
-    // 加入統計資訊
+    // Add statistics information
     if (stats) {
       result.stats = stats;
     }
@@ -231,7 +231,7 @@ export class ClusterListTool extends BaseTool {
   }
 
   /**
-   * 格式化統計資訊區塊
+   * Format statistics section
    */
   formatStatsSection(stats) {
     let result = `**Cluster Manager Statistics:**\n`;
@@ -244,7 +244,7 @@ export class ClusterListTool extends BaseTool {
   }
 
   /**
-   * 驗證輸入參數
+   * Validate input parameters
    */
   validateInput(args) {
     if (args.format && !['table', 'detailed', 'json'].includes(args.format)) {

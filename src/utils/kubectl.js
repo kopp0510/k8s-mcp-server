@@ -8,29 +8,29 @@ export class KubectlRunner {
   }
 
   /**
-   * 加入叢集 context 和 kubeconfig 參數到 kubectl 指令
-   * @param {Array} args - kubectl 參數陣列
-   * @param {string} clusterId - 叢集 ID (可選)
-   * @returns {Array} 更新後的參數陣列
+   * Add cluster context and kubeconfig parameters to kubectl command
+   * @param {Array} args - kubectl parameter array
+   * @param {string} clusterId - cluster ID (optional)
+   * @returns {Array} updated parameter array
    */
   addClusterContext(args, clusterId) {
     if (!clusterId) {
       return args;
     }
 
-    // 如果已經有 --context 或 --kubeconfig 參數，不重複加入
+    // If already has --context or --kubeconfig parameters, do not repeat
     if (args.includes('--context') || args.includes('--kubeconfig')) {
       return args;
     }
 
     try {
-      // 從 cluster manager 取得叢集配置
+      // Get cluster configuration from cluster manager
       const cluster = clusterManager.getCluster(clusterId);
 
       let finalArgs = [...args];
 
       if (cluster.type === 'local') {
-        // Local 類型叢集：同時添加 context 和 kubeconfig 參數
+        // Local type cluster: add context and kubeconfig parameters
         if (cluster.context) {
           finalArgs = ['--context', cluster.context, ...finalArgs];
         }
@@ -38,16 +38,20 @@ export class KubectlRunner {
           finalArgs = ['--kubeconfig', cluster.kubeconfig, ...finalArgs];
         }
       } else if (cluster.type === 'gke') {
-        // GKE 類型叢集：只使用 context（kubeconfig 由 gcloud 管理）
+        // GKE type cluster: use context only (kubeconfig managed by gcloud)
         const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
         finalArgs = ['--context', contextName, ...finalArgs];
       }
 
       return finalArgs;
     } catch (error) {
-      logger.error(`Failed to get cluster config for ${clusterId}: ${error.message}`);
-      // 如果取得叢集配置失敗，應該停止執行而不是繼續
-      throw new Error(`Invalid cluster configuration for '${clusterId}': ${error.message}`);
+      logger.error(`Cluster configuration retrieval failed: ${clusterId}`, {
+        clusterId,
+        error: error.message,
+        action: 'ABORT_KUBECTL_EXECUTION'
+      });
+      // If cluster configuration retrieval fails, execution should stop instead of continuing
+      throw new Error(`Invalid cluster configuration '${clusterId}': ${error.message}`);
     }
   }
 
@@ -57,7 +61,7 @@ export class KubectlRunner {
       throw new Error('kubectl arguments must be a non-empty array');
     }
 
-    // 加入叢集 context 和 kubeconfig 參數
+    // Add cluster context and kubeconfig parameters
     const finalArgs = this.addClusterContext(args, cluster);
 
     // Build command

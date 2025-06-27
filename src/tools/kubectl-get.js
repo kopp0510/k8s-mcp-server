@@ -85,10 +85,13 @@ export class KubectlGetTool extends BaseTool {
 
       const { resource, namespace, allNamespaces, name, labelSelector, labels, cluster } = args;
 
-      // 驗證叢集 ID (如果提供)
+      // Validate cluster ID (if provided)
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check, if failed will directly throw error
+      await this.validatePrerequisites(args);
 
       // Validate resource type
       const supportedResources = ['pods', 'nodes', 'deployments', 'services', 'replicasets', 'daemonsets', 'statefulsets', 'jobs', 'cronjobs', 'configmaps', 'secrets', 'pv', 'pvc', 'ingress', 'hpa', 'namespaces', 'events', 'serviceaccounts', 'clusterroles', 'clusterrolebindings'];
@@ -147,7 +150,8 @@ export class KubectlGetTool extends BaseTool {
 
       kubectlArgs.push('-o', 'json');
 
-      // Execute command (傳遞叢集參數)
+      // Pass cluster parameter
+      // Execute command
       const result = await kubectl.execute(kubectlArgs, cluster);
 
       // Parse JSON result
@@ -181,6 +185,12 @@ export class KubectlGetTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }

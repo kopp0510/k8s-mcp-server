@@ -86,10 +86,13 @@ export class HelmListTool extends BaseTool {
         cluster
       } = args;
 
-      // 驗證叢集 ID (如果提供)
+      // Validate cluster ID (if provided)
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate parameter combination - only check conflicts when allNamespaces is explicitly set
       if (namespace && args.allNamespaces === true) {
@@ -120,7 +123,7 @@ export class HelmListTool extends BaseTool {
         finalCommand: `helm ${command.join(' ')}`
       });
 
-      // Execute command (傳遞叢集參數)
+      // Execute command (pass cluster parameter)
       const output = await helm.execute(command, cluster);
 
       // Format output
@@ -134,6 +137,12 @@ export class HelmListTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }

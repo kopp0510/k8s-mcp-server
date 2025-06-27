@@ -27,7 +27,7 @@ export class HelmRepoListTool extends BaseTool {
           },
           cluster: {
             type: 'string',
-            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            description: 'Specify the cluster ID (optional, default to current cluster)',
             minLength: 1,
             maxLength: 64
           }
@@ -43,10 +43,13 @@ export class HelmRepoListTool extends BaseTool {
 
       const { output = 'table', cluster } = args;
 
-      // 驗證叢集參數
+      // Validate cluster parameter
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Build helm repo list command
       const command = this.buildHelmRepoListCommand(output);
@@ -62,6 +65,12 @@ export class HelmRepoListTool extends BaseTool {
 
     } catch (error) {
       this.logError(args, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(this.formatErrorMessage(error.message));
     }
   }

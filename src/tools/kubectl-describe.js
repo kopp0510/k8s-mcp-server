@@ -34,7 +34,7 @@ export class KubectlDescribeTool extends BaseTool {
           },
           cluster: {
             type: 'string',
-            description: '指定要操作的叢集 ID（可選，預設使用當前叢集）',
+            description: 'Specify the cluster ID (optional, defaults to the current cluster)',
             minLength: 1,
             maxLength: 64
           }
@@ -52,10 +52,13 @@ export class KubectlDescribeTool extends BaseTool {
       // Validate input
       validator.validateInput({ resource, name, namespace, cluster });
 
-      // 驗證叢集參數
+      // Validate cluster parameter
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Validate resource name
       validator.validateResourceName(name);
@@ -90,6 +93,11 @@ export class KubectlDescribeTool extends BaseTool {
 
     } catch (error) {
       logger.error(`kubectl describe failed: ${resource}/${name}`, error);
+
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
 
       // Handle common errors
       let errorMessage = error.message || 'Unknown error';

@@ -1,6 +1,6 @@
 /**
  * GKE Authentication Tool
- * 認證 GKE 叢集並取得 credentials
+ * Authenticate to GKE cluster using service account and get cluster credentials
  */
 
 import { BaseTool } from './base-tool.js';
@@ -41,22 +41,22 @@ export class GkeAuthTool extends BaseTool {
     try {
       const { cluster: clusterName, verify = true, region } = args;
 
-      // 驗證輸入
+      // Validate input
       this.validateInput(args);
 
-      // 取得叢集配置
+      // Get cluster configuration
       const cluster = clusterManager.getCluster(clusterName);
 
       if (cluster.type !== 'gke') {
         return this.createErrorResponse(`Cluster '${clusterName}' is not a GKE cluster (type: ${cluster.type})`);
       }
 
-      // 如果提供了 region 參數，覆蓋設定值
+      // If region parameter is provided, override config value
       if (region) {
         cluster.region = region;
       }
 
-      // 執行認證
+      // Perform authentication
       const authResult = await this.performAuthentication(cluster, verify);
 
       this.logSuccess(args, { cluster: cluster.name, project: cluster.project });
@@ -69,7 +69,7 @@ export class GkeAuthTool extends BaseTool {
   }
 
   /**
-   * 執行 GKE 認證流程
+   * Perform GKE authentication process
    */
   async performAuthentication(cluster, verify) {
     let result = `GKE Authentication Results\n`;
@@ -84,7 +84,7 @@ export class GkeAuthTool extends BaseTool {
     result += `• Key File: ${cluster.keyFile}\n\n`;
 
     try {
-      // 執行認證
+      // Perform authentication
       result += `**Authentication Process:**\n`;
 
       const startTime = Date.now();
@@ -100,7 +100,7 @@ export class GkeAuthTool extends BaseTool {
 
       result += `• Total time: ${duration}ms\n\n`;
 
-      // 取得叢集資訊
+      // Get cluster information
       if (verify) {
         try {
           const clusterInfo = await this.getClusterInfo(cluster);
@@ -146,18 +146,23 @@ export class GkeAuthTool extends BaseTool {
   }
 
   /**
-   * 取得叢集基本資訊
+   * Get cluster basic information
    */
   async getClusterInfo(cluster) {
     try {
-      // 執行基本的 kubectl 指令來驗證連線
+      const kubeconfigPath = '/home/nodejs/.kube/config';
+      const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
+
+      // Execute basic kubectl command to verify connection
       const output = await clusterManager.executeCommand('kubectl', [
-        'cluster-info', '--request-timeout=10s'
+        'cluster-info', '--request-timeout=10s',
+        '--context', contextName,
+        '--kubeconfig', kubeconfigPath
       ]);
 
       let info = `• Cluster endpoint: Connected ✓\n`;
 
-      // 解析輸出取得更多資訊
+      // Parse output for more information
       const lines = output.split('\n');
       for (const line of lines) {
         if (line.includes('Kubernetes control plane')) {
@@ -171,10 +176,12 @@ export class GkeAuthTool extends BaseTool {
         }
       }
 
-      // 取得節點資訊
+      // Get node information
       try {
         const nodesOutput = await clusterManager.executeCommand('kubectl', [
-          'get', 'nodes', '--no-headers', '--request-timeout=5s'
+          'get', 'nodes', '--no-headers', '--request-timeout=5s',
+          '--context', contextName,
+          '--kubeconfig', kubeconfigPath
         ]);
         const nodeCount = nodesOutput.split('\n').filter(line => line.trim()).length;
         info += `• Nodes: ${nodeCount} available\n`;
@@ -182,10 +189,12 @@ export class GkeAuthTool extends BaseTool {
         info += `• Nodes: Unable to retrieve (${nodeError.message})\n`;
       }
 
-      // 取得命名空間資訊
+      // Get namespace information
       try {
         const nsOutput = await clusterManager.executeCommand('kubectl', [
-          'get', 'namespaces', '--no-headers', '--request-timeout=5s'
+          'get', 'namespaces', '--no-headers', '--request-timeout=5s',
+          '--context', contextName,
+          '--kubeconfig', kubeconfigPath
         ]);
         const nsCount = nsOutput.split('\n').filter(line => line.trim()).length;
         info += `• Namespaces: ${nsCount} available\n`;
@@ -201,7 +210,7 @@ export class GkeAuthTool extends BaseTool {
   }
 
   /**
-   * 驗證輸入參數
+   * Validate input parameters
    */
   validateInput(args) {
     if (!args.cluster || typeof args.cluster !== 'string') {

@@ -66,10 +66,13 @@ export class KubectlScaleDeploymentTool extends BaseTool {
         cluster
       } = args;
 
-      // 驗證叢集參數
+      // Validate cluster parameter
       if (cluster) {
         validator.validateClusterId(cluster);
       }
+
+      // Added: Prerequisite check
+      await this.validatePrerequisites({ cluster });
 
       // Check if Deployment exists and get current state
       const currentState = await this.getDeploymentState(deploymentName, namespace, cluster);
@@ -93,6 +96,11 @@ export class KubectlScaleDeploymentTool extends BaseTool {
       return this.createResponse(result);
 
     } catch (error) {
+      // If it is a prerequisite error, rethrow it directly for the MCP handler to process
+      if (error.name === 'PrerequisiteError') {
+        throw error;
+      }
+
       return this.createErrorResponse(error.message);
     }
   }
