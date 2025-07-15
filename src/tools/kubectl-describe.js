@@ -49,6 +49,8 @@ export class KubectlDescribeTool extends BaseTool {
     const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
 
     try {
+      logger.info(`Starting kubectl describe: ${resource}/${name}`, { resource, name, namespace, cluster });
+
       // Validate input
       validator.validateInput({ resource, name, namespace, cluster });
 
@@ -68,15 +70,20 @@ export class KubectlDescribeTool extends BaseTool {
         validator.validateNamespace(namespace);
       }
 
+      logger.info(`Validation completed for ${resource}/${name}`);
+
       // First check if resource exists
       try {
+        logger.info(`Checking if ${resource}/${name} exists`);
         const checkArgs = ['get', resource, name];
         if (namespacedResources.includes(resource)) {
           checkArgs.push('-n', namespace);
         }
         checkArgs.push('--no-headers');
         await kubectl.execute(checkArgs, cluster);
+        logger.info(`Resource ${resource}/${name} exists`);
       } catch (error) {
+        logger.warn(`Resource ${resource}/${name} not found:`, error.message);
         let errorMessage = `${resource} "${name}" not found`;
         if (namespacedResources.includes(resource)) {
           errorMessage += ` in namespace "${namespace}"`;
@@ -105,11 +112,23 @@ export class KubectlDescribeTool extends BaseTool {
         args.push('-n', namespace);
       }
 
+      logger.info(`Executing kubectl describe with args:`, args);
+
       // Execute kubectl describe with cluster support
       const output = await kubectl.execute(args, cluster);
 
-      // Format output
-      const formattedOutput = this.formatDescribeOutput(resource, name, namespace, output);
+      logger.info(`kubectl describe completed, output length: ${output ? output.length : 0}`);
+
+      // Format output with error handling
+      let formattedOutput;
+      try {
+        formattedOutput = this.formatDescribeOutput(resource, name, namespace, output);
+        logger.info(`Output formatting completed, formatted length: ${formattedOutput ? formattedOutput.length : 0}`);
+      } catch (formatError) {
+        logger.error(`Error formatting output:`, formatError);
+        // Fallback to raw output if formatting fails
+        formattedOutput = `${resource.toUpperCase()} Details: ${name}\n${'='.repeat(30)}\n\n${output || 'No output received'}`;
+      }
 
       return {
         content: [{
@@ -157,70 +176,86 @@ export class KubectlDescribeTool extends BaseTool {
   }
 
   /**
-   * Format describe output
+   * Format describe output with robust error handling
    */
   formatDescribeOutput(resource, name, namespace, rawOutput) {
-    const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
-
-    let header = `${resource.toUpperCase()} Details: ${name}`;
-
-    if (namespacedResources.includes(resource)) {
-      header += ` (namespace: ${namespace})`;
-    }
-
-    let output = header + '\n';
-    output += '='.repeat(header.length) + '\n\n';
-
-    // Parse and format output
-    const lines = rawOutput.split('\n');
-    let currentSection = '';
-    let inEventsSection = false;
-
-    for (let line of lines) {
-      const trimmedLine = line.trim();
-
-      // Skip empty lines
-      if (!trimmedLine) {
-        output += '\n';
-        continue;
+    try {
+      // Input validation
+      if (!rawOutput || typeof rawOutput !== 'string') {
+        logger.warn('Invalid rawOutput received:', typeof rawOutput);
+        return `${resource.toUpperCase()} Details: ${name}\n${'='.repeat(30)}\n\nNo output received from kubectl describe`;
       }
 
-      // Detect main sections
-      if (trimmedLine.includes(':') && !trimmedLine.startsWith(' ') && !trimmedLine.includes('  ')) {
-        if (trimmedLine.toLowerCase().includes('events')) {
-          inEventsSection = true;
-          output += '**Event Log:**\n';
-          output += '```\n';
-        } else if (trimmedLine.toLowerCase().includes('conditions')) {
-          output += '**Status Conditions:**\n';
-        } else if (trimmedLine.toLowerCase().includes('labels')) {
-          output += '**Labels:**\n';
-        } else if (trimmedLine.toLowerCase().includes('annotations')) {
-          output += '**Annotations:**\n';
-        } else {
-          // Other section headers
-          currentSection = trimmedLine;
-          output += `**${trimmedLine}**\n`;
+      const namespacedResources = ['pod', 'service', 'deployment', 'configmap', 'secret', 'serviceaccount'];
+
+      let header = `${resource.toUpperCase()} Details: ${name}`;
+
+      if (namespacedResources.includes(resource)) {
+        header += ` (namespace: ${namespace})`;
+      }
+
+      let output = header + '\n';
+      output += '='.repeat(header.length) + '\n\n';
+
+      // Parse and format output with safety checks
+      const lines = rawOutput.split('\n');
+      let inEventsSection = false;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i] || '';
+        const trimmedLine = line.trim();
+
+        // Skip empty lines
+        if (!trimmedLine) {
+          output += '\n';
+          continue;
         }
-      } else {
-        // Content lines
-        if (inEventsSection) {
-          output += line + '\n';
+
+        // Detect main sections - more robust detection
+        if (trimmedLine.includes(':') && !trimmedLine.startsWith(' ') && !trimmedLine.includes('  ')) {
+          if (trimmedLine.toLowerCase().includes('events')) {
+            inEventsSection = true;
+            output += '**Event Log:**\n';
+            output += '```\n';
+          } else if (trimmedLine.toLowerCase().includes('conditions')) {
+            inEventsSection = false;
+            output += '**Status Conditions:**\n';
+          } else if (trimmedLine.toLowerCase().includes('labels')) {
+            inEventsSection = false;
+            output += '**Labels:**\n';
+          } else if (trimmedLine.toLowerCase().includes('annotations')) {
+            inEventsSection = false;
+            output += '**Annotations:**\n';
+          } else {
+            // Other section headers
+            inEventsSection = false;
+            output += `**${trimmedLine}**\n`;
+          }
         } else {
-          // Indented content
-          output += `  ${trimmedLine}\n`;
+          // Content lines
+          if (inEventsSection) {
+            output += line + '\n';
+          } else {
+            // Indented content
+            output += `  ${trimmedLine}\n`;
+          }
         }
       }
+
+      // If in events section, close code block
+      if (inEventsSection) {
+        output += '```\n';
+      }
+
+      output += '\n**Tip**: Use `kubectl_logs` to view Pod logs, use `kubectl_get` to view resource lists\n';
+
+      return output;
+
+    } catch (error) {
+      logger.error('Error in formatDescribeOutput:', error);
+      // Return safe fallback
+      return `${resource.toUpperCase()} Details: ${name}\n${'='.repeat(30)}\n\n${rawOutput || 'Error formatting output'}`;
     }
-
-    // If in events section, close code block
-    if (inEventsSection) {
-      output += '```\n';
-    }
-
-    output += '\n**Tip**: Use `kubectl_logs` to view Pod logs, use `kubectl_get` to view resource lists\n';
-
-    return output;
   }
 
   /**
