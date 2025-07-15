@@ -68,6 +68,33 @@ export class KubectlDescribeTool extends BaseTool {
         validator.validateNamespace(namespace);
       }
 
+      // First check if resource exists
+      try {
+        const checkArgs = ['get', resource, name];
+        if (namespacedResources.includes(resource)) {
+          checkArgs.push('-n', namespace);
+        }
+        checkArgs.push('--no-headers');
+        await kubectl.execute(checkArgs, cluster);
+      } catch (error) {
+        let errorMessage = `${resource} "${name}" not found`;
+        if (namespacedResources.includes(resource)) {
+          errorMessage += ` in namespace "${namespace}"`;
+        }
+        errorMessage += '. Please verify:';
+        errorMessage += `\n1. The ${resource} name is correct`;
+        if (namespacedResources.includes(resource)) {
+          errorMessage += '\n2. The namespace is correct';
+        }
+        errorMessage += `\n3. You have permissions to access this ${resource}`;
+        errorMessage += '\n\nTip: Use kubectl_get to list available resources:';
+        errorMessage += `\n• List all ${resource}s: {"resource": "${resource}s"${namespacedResources.includes(resource) ? `, "namespace": "${namespace}"` : ''}}`;
+        if (namespacedResources.includes(resource)) {
+          errorMessage += `\n• List across all namespaces: {"resource": "${resource}s", "allNamespaces": true}`;
+        }
+        throw new Error(errorMessage);
+      }
+
       logger.info(`Describing ${resource}: ${name}`, { resource, name, namespace, cluster });
 
       // Build kubectl describe command
@@ -102,15 +129,21 @@ export class KubectlDescribeTool extends BaseTool {
       // Handle common errors
       let errorMessage = error.message || 'Unknown error';
 
-      if (errorMessage.includes('not found')) {
-        errorMessage = `Cannot find ${resource} '${name}'`;
-        if (namespacedResources.includes(resource)) {
-          errorMessage += ` (namespace: ${namespace})`;
+      if (!errorMessage.includes('not found')) {  // Skip if already handled by existence check
+        if (errorMessage.includes('Unauthorized') || errorMessage.includes('Forbidden')) {
+          errorMessage = `Insufficient permissions to describe ${resource} '${name}'`;
+          if (namespacedResources.includes(resource)) {
+            errorMessage += ` in namespace "${namespace}"`;
+          }
+          errorMessage += '\nPlease verify your RBAC permissions.';
+        } else if (errorMessage.includes('connection refused')) {
+          errorMessage = 'Unable to connect to Kubernetes cluster. Please verify:';
+          errorMessage += '\n1. The cluster is running and accessible';
+          errorMessage += '\n2. Your kubeconfig is correctly configured';
+          if (cluster) {
+            errorMessage += `\n3. The cluster ID "${cluster}" is correct`;
+          }
         }
-      } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('Forbidden')) {
-        errorMessage = `Insufficient permissions to describe ${resource} '${name}'`;
-      } else if (errorMessage.includes('connection refused')) {
-        errorMessage = 'Unable to connect to Kubernetes cluster';
       }
 
       return {

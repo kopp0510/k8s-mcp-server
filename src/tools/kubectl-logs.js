@@ -88,16 +88,37 @@ export class KubectlLogsTool extends BaseTool {
         throw new Error('Follow mode is disabled for security reasons');
       }
 
+      // First check if pod exists in the specified namespace
+      try {
+        const checkPodArgs = ['get', 'pod', pod, '-n', namespace, '--no-headers'];
+        await kubectl.execute(checkPodArgs, cluster);
+      } catch (error) {
+        throw new Error(`Pod "${pod}" not found in namespace "${namespace}". Please verify the pod name and namespace are correct.`);
+      }
+
+      // If container is specified, verify it exists in the pod
+      if (container) {
+        try {
+          const podDetailsArgs = ['get', 'pod', pod, '-n', namespace, '-o', 'json'];
+          const podDetails = JSON.parse(await kubectl.execute(podDetailsArgs, cluster));
+          const containers = podDetails.spec.containers.map(c => c.name);
+
+          if (!containers.includes(container)) {
+            throw new Error(`Container "${container}" not found in pod "${pod}". Available containers: ${containers.join(', ')}`);
+          }
+        } catch (error) {
+          if (error.message.includes('JSON')) {
+            throw new Error(`Failed to verify container existence in pod "${pod}"`);
+          }
+          throw error;
+        }
+      }
+
       // Limit lines
       const maxLines = Math.min(Math.max(1, lines), 1000);
 
       // Build kubectl logs command
-      const kubectlArgs = ['logs', pod];
-
-      // Add namespace
-      if (namespace && namespace !== 'default') {
-        kubectlArgs.push('-n', namespace);
-      }
+      const kubectlArgs = ['logs', pod, '-n', namespace];  // Always include namespace explicitly
 
       // Add container name
       if (container) {
