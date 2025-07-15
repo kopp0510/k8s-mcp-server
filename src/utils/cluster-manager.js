@@ -170,7 +170,7 @@ export class ClusterManager {
       return;
     }
 
-    // Correct: Explicitly declare kubeconfigPath
+    // Declare kubeconfigPath only once for this function
     const kubeconfigPath = '/home/nodejs/.kube/config';
 
     logger.info(`Starting GKE authentication for cluster: ${cluster.name}`, {
@@ -392,15 +392,15 @@ export class ClusterManager {
         return true; // Non-GKE cluster does not need to check
       }
 
-      // Use the same kubeconfig path as when authenticating
-      const kubeconfigPath = '/home/nodejs/.kube/config';
+      // Use kubeconfig path (avoid redeclaring const variable)
+      const gkeKubeconfigPath = '/home/nodejs/.kube/config';
       const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
 
       logger.debug(`Checking GKE cluster authentication for: ${clusterId}`);
 
       // Check if kubeconfig file exists
-      if (!fs.existsSync(kubeconfigPath)) {
-        logger.debug(`Kubeconfig file not found: ${kubeconfigPath}`);
+      if (!fs.existsSync(gkeKubeconfigPath)) {
+        logger.debug(`Kubeconfig file not found: ${gkeKubeconfigPath}`);
         return false;
       }
 
@@ -410,7 +410,7 @@ export class ClusterManager {
           'cluster-info',
           '--request-timeout=5s',
           '--context', contextName,
-          '--kubeconfig', kubeconfigPath
+          '--kubeconfig', gkeKubeconfigPath
         ], { timeout: 10 });
         logger.debug(`GKE cluster ${clusterId} authenticated via direct context test`);
         return true;
@@ -420,7 +420,7 @@ export class ClusterManager {
 
       // Method 2: Check if context exists in kubeconfig
       try {
-        const allContexts = await this.executeCommand('kubectl', ['config', 'get-contexts', '--no-headers', '--kubeconfig', kubeconfigPath], { timeout: 10 });
+        const allContexts = await this.executeCommand('kubectl', ['config', 'get-contexts', '--no-headers', '--kubeconfig', gkeKubeconfigPath], { timeout: 10 });
         const hasGkeContext = allContexts.split('\n').some(line => line.includes(contextName));
 
         if (hasGkeContext) {
