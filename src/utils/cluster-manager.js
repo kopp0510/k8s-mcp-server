@@ -232,6 +232,11 @@ export class ClusterManager {
 
       this.currentCluster = cluster.id;
 
+      // Add a small delay to ensure kubeconfig file operations are fully completed
+      // This prevents concurrent access issues when multiple kubectl commands run immediately after authentication
+      logger.debug('Waiting for kubeconfig file operations to stabilize');
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       logger.info(`Successfully authenticated GKE cluster: ${cluster.name}`, {
         project: cluster.project,
         cluster: cluster.cluster,
@@ -304,48 +309,86 @@ export class ClusterManager {
     return new Promise((resolve, reject) => {
       logger.debug(`Executing command: ${command} ${args.join(' ')}`);
 
-      const process = spawn(command, args, {
+      const childProcess = spawn(command, args, {
         stdio: 'pipe',
+        env: {
+          ...process.env,
+          PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+          USE_GKE_GCLOUD_AUTH_PLUGIN: 'True'
+        },
         ...options
       });
 
       let stdout = '';
       let stderr = '';
+      let isTimedOut = false;
 
-      process.stdout.on('data', (data) => {
+      childProcess.stdout.on('data', (data) => {
         stdout += data.toString();
       });
 
-      process.stderr.on('data', (data) => {
+      childProcess.stderr.on('data', (data) => {
         stderr += data.toString();
       });
 
-      process.on('close', (code) => {
+      childProcess.on('close', (code, signal) => {
+        if (isTimedOut) {
+          return; // Already handled by timeout
+        }
+
         if (code === 0) {
           resolve(stdout.trim());
         } else {
-          const error = stderr.trim() || `Command failed with code ${code}`;
-          logger.error(`Command execution failed: ${command}`, {
-            args: args.join(' '),
-            code,
-            stderr: error
-          });
+          let error;
+          if (code === null || signal) {
+            // Process was terminated by signal
+            error = `Process terminated by signal (${signal || 'unknown'}). stderr: ${stderr.trim() || 'No error output'}`;
+            logger.error(`Process terminated by signal: ${command}`, {
+              args: args.join(' '),
+              signal: signal || 'unknown',
+              code: 'SIGNAL_TERMINATED',
+              stderr: stderr.trim(),
+              stdout: stdout.trim()
+            });
+          } else {
+            error = stderr.trim() || `Command failed with code ${code}`;
+            logger.error(`Command execution failed: ${command}`, {
+              args: args.join(' '),
+              code,
+              stderr: error
+            });
+          }
           reject(new Error(error));
         }
       });
 
-      process.on('error', (error) => {
-        logger.error(`Command execution error: ${command}`, error);
+      childProcess.on('error', (error) => {
+        if (isTimedOut) {
+          return; // Already handled by timeout
+        }
+        logger.error(`Command execution error: ${command}`, {
+          error: error.message,
+          args: args.join(' ')
+        });
         reject(error);
       });
 
       // Set timeout
       const timer = setTimeout(() => {
-        process.kill('SIGTERM');
-        reject(new Error(`Command timeout after ${timeout}s: ${command}`));
+        isTimedOut = true;
+        childProcess.kill('SIGTERM');
+
+        // If SIGTERM doesn't work, try SIGKILL after a short delay
+        setTimeout(() => {
+          if (!childProcess.killed) {
+            childProcess.kill('SIGKILL');
+          }
+        }, 1000);
+
+        reject(new Error(`Command timeout after ${timeout}s: ${command} ${args.join(' ')}`));
       }, timeout * 1000);
 
-      process.on('close', () => {
+      childProcess.on('close', () => {
         clearTimeout(timer);
       });
     });
@@ -392,6 +435,9 @@ export class ClusterManager {
         return true; // Non-GKE cluster does not need to check
       }
 
+      // Small delay to avoid concurrent kubeconfig file access
+      await new Promise(resolve => setTimeout(resolve, 100));
+
       // Use kubeconfig path (avoid redeclaring const variable)
       const gkeKubeconfigPath = '/home/nodejs/.kube/config';
       const contextName = `gke_${cluster.project}_${cluster.region}_${cluster.cluster}`;
@@ -404,36 +450,60 @@ export class ClusterManager {
         return false;
       }
 
-      // Method 1: Directly test using specified context to connect to cluster
+      // Method 1: Check if target context exists in kubeconfig
       try {
-        await this.executeCommand('kubectl', [
-          'cluster-info',
-          '--request-timeout=5s',
-          '--context', contextName,
+        const allContexts = await this.executeCommand('kubectl', [
+          'config', 'get-contexts', '--no-headers',
           '--kubeconfig', gkeKubeconfigPath
         ], { timeout: 10 });
-        logger.debug(`GKE cluster ${clusterId} authenticated via direct context test`);
-        return true;
-      } catch (directError) {
-        logger.debug(`Direct context test failed for ${clusterId}: ${directError.message}`);
-      }
 
-      // Method 2: Check if context exists in kubeconfig
-      try {
-        const allContexts = await this.executeCommand('kubectl', ['config', 'get-contexts', '--no-headers', '--kubeconfig', gkeKubeconfigPath], { timeout: 10 });
         const hasGkeContext = allContexts.split('\n').some(line => line.includes(contextName));
 
-        if (hasGkeContext) {
-          logger.debug(`GKE cluster ${clusterId} context found in kubeconfig`);
-          return true;
-        } else {
+        if (!hasGkeContext) {
           logger.debug(`GKE cluster ${clusterId} context not found in kubeconfig`);
+          return false;
         }
+
+        logger.debug(`GKE cluster ${clusterId} context found in kubeconfig`);
       } catch (listError) {
         logger.debug(`Context list check failed for ${clusterId}: ${listError.message}`);
+        return false;
       }
 
-      return false;
+      // Method 2: Check current context and test connectivity
+      // Use the same approach as gke_auth verification (no --context parameter)
+      try {
+        // Get current context
+        const currentContext = await this.executeCommand('kubectl', [
+          'config', 'current-context',
+          '--kubeconfig', gkeKubeconfigPath
+        ], { timeout: 10 });
+
+        // If current context is not the target, switch to it
+        if (currentContext !== contextName) {
+          logger.debug(`Switching to target context ${contextName} from ${currentContext}`);
+          await this.executeCommand('kubectl', [
+            'config', 'use-context', contextName,
+            '--kubeconfig', gkeKubeconfigPath
+          ], { timeout: 10 });
+        }
+
+        // Test connectivity using the same method as gke_auth verification
+        // Only use --kubeconfig, rely on current context (no --context parameter)
+        await this.executeCommand('kubectl', [
+          'cluster-info',
+          '--request-timeout=10s',
+          '--kubeconfig', gkeKubeconfigPath
+        ], { timeout: 15 });
+
+        logger.debug(`GKE cluster ${clusterId} authenticated successfully`);
+        return true;
+
+      } catch (connectError) {
+        logger.debug(`GKE cluster ${clusterId} connectivity test failed: ${connectError.message}`);
+        return false;
+      }
+
     } catch (error) {
       logger.debug(`GKE cluster ${clusterId} authentication check failed: ${error.message}`);
       return false;
