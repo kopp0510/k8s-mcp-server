@@ -16,6 +16,8 @@ export class ClusterManager {
     this.clusters = null;
     this.currentCluster = null;
     this.loadClusters();
+    this.authCache = new Map(); // 添加認證緩存
+    this.authTimestamps = new Map(); // 添加認證時間戳
   }
 
   /**
@@ -232,10 +234,12 @@ export class ClusterManager {
 
       this.currentCluster = cluster.id;
 
-      // Add a small delay to ensure kubeconfig file operations are fully completed
-      // This prevents concurrent access issues when multiple kubectl commands run immediately after authentication
-      logger.debug('Waiting for kubeconfig file operations to stabilize');
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // 認證成功後設置緩存
+      this.authCache.set(cluster.id, true);
+      this.authTimestamps.set(cluster.id, Date.now());
+
+      // 延長等待時間
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
       logger.info(`Successfully authenticated GKE cluster: ${cluster.name}`, {
         project: cluster.project,
@@ -428,6 +432,13 @@ export class ClusterManager {
    * @returns {Promise<boolean>} Whether authenticated
    */
   async isGkeClusterAuthenticated(clusterId) {
+    // 檢查最近認證記錄 (5分鐘內有效)
+    const authTime = this.authTimestamps.get(clusterId);
+    if (authTime && (Date.now() - authTime) < 300000) { // 5分鐘
+      logger.debug(`Using cached auth status for ${clusterId}`);
+      return this.authCache.get(clusterId) || false;
+    }
+
     try {
       const cluster = this.getCluster(clusterId);
 
@@ -435,8 +446,8 @@ export class ClusterManager {
         return true; // Non-GKE cluster does not need to check
       }
 
-      // Small delay to avoid concurrent kubeconfig file access
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Delay to avoid concurrent kubeconfig file access
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Use kubeconfig path (avoid redeclaring const variable)
       const gkeKubeconfigPath = '/home/nodejs/.kube/config';
