@@ -1,11 +1,11 @@
 # Kubernetes & Helm MCP Server
 
-A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes and Helm environment management, with n8n integration support.
+A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes and Helm environment management, with n8n and Dify integration support.
 
 ## Features
 
-- **Native n8n Support** - Perfect support for n8n MCP Client nodes
-- **SSE Connection** - Uses Server-Sent Events for real-time bidirectional communication
+- **Multi-Platform Support** - Perfect support for n8n and Dify MCP clients
+- **Dual Transport Mode** - Supports both SSE and Streamable HTTP transport protocols
 - **Kubernetes Integration** - Provides complete kubectl tool access
 - **Helm Support** - Provides Helm chart and release management functionality
 - **Modular Architecture** - Clear separation between entry point and server implementation
@@ -14,15 +14,18 @@ A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes a
 - **Resource Monitoring** - Complete resource usage monitoring functionality
 - **Label Filtering** - Powerful label filtering and search functionality
 - **Multi-Resource Support** - Supports 19 different Kubernetes resource types
+- **MCP Protocol Compliance** - Fully compliant with MCP 2024-11-05 protocol specification
 
 ## Version Information
 
-- **Current Version**: 2.1.3
+- **Current Version**: 2.1.4
 - **Completion Rate**: 100%
-- **Supported Tools**: 16 major tools
+- **Supported Tools**: 17 major tools
 - **Error Handling**: Complete refactoring
 - **Authentication**: GKE cluster authentication integration
 - **Security**: kubectl/helm dangerous operation prevention
+- **Dify Compatibility**: Full support for Streamable HTTP transport
+- **n8n Compatibility**: Full support for SSE transport
 
 ## File Structure
 
@@ -258,11 +261,11 @@ services:
     restart: unless-stopped
 ```
 
-## Using with n8n
+## Using with Dify
 
 ### Step 1: Start MCP Server
 
-Ensure the MCP Server is running in SSE mode:
+Ensure the MCP Server is running in HTTP mode:
 
 ```bash
 cd k8s-mcp/k8s-mcp-server
@@ -273,10 +276,75 @@ After the server starts, you will see:
 
 ```
 MCP Server started at http://localhost:3001
+MCP (Streamable HTTP): http://localhost:3001/mcp (Dify compatible)
+SSE endpoint: http://localhost:3001/sse (n8n compatible)
+Health check: http://localhost:3001/health
+Hybrid mode - supports both SSE and Streamable HTTP transport
+```
+
+### Step 2: Configure Dify MCP Settings
+
+Add the following to your Dify MCP SERVERS CONFIG:
+
+```json
+{
+  "k8s-mcp-server": {
+    "transport": "streamable_http",
+    "url": "http://k8s-all-in-one-kubectl-mcp-tool.n8n:3000/mcp",
+    "timeout": 30
+  }
+}
+```
+
+**Important Configuration Notes**:
+- **transport**: Must use `"streamable_http"` (recommended)
+- **url**: Point to your MCP Server's `/mcp` endpoint
+- **timeout**: Recommended 30 seconds
+
+### Step 3: Use in Dify Workflows
+
+1. **Add Agent node to your workflow**
+2. **Set MCP RESOURCES AS TOOLS to True**
+3. **Set MCP PROMPTS AS TOOLS to True**
+4. **Tools will automatically load into the agent**
+
+### Step 4: Usage Examples
+
+**Get Pod List**:
+```
+Please help me view all Pods in the default namespace
+```
+
+**Check Node Resource Usage**:
+```
+Please show CPU and memory usage for all nodes
+```
+
+**Scale Deployment**:
+```
+Please scale the my-web-app Deployment to 3 replicas
+```
+
+## Using with n8n
+
+### Step 1: Start MCP Server
+
+Ensure the MCP Server is running in HTTP mode (supports both SSE and Streamable HTTP):
+
+```bash
+cd k8s-mcp/k8s-mcp-server
+npm run start:http -- --port 3001
+```
+
+After the server starts, you will see:
+
+```
+MCP Server started at http://localhost:3001
+MCP (Streamable HTTP): http://localhost:3001/mcp (Dify compatible)
 SSE endpoint: http://localhost:3001/sse (n8n connects here)
 Message endpoint: http://localhost:3001/messages
 Health check: http://localhost:3001/health
-SSE mode - designed for n8n
+Hybrid mode - supports both SSE and Streamable HTTP transport
 ```
 
 ## Usage
@@ -320,6 +388,110 @@ curl -N http://localhost:3001/sse
    ```
 2. Restart Cursor editor
 3. Use tools in MCP panel
+
+## API Endpoints
+
+| Endpoint | Method | Description | Purpose |
+|----------|--------|-------------|---------|
+| `/health` | GET | Health check | Service status check |
+| `/mcp` | POST/GET | MCP Streamable HTTP endpoint | Dify connection |
+| `/sse` | GET | SSE connection endpoint | n8n connection |
+| `/messages` | POST | MCP message processing endpoint | SSE mode message processing |
+| `/sse-status` | GET | SSE connection status monitoring | Debugging |
+| `/tools` | GET | Tool list | Debugging |
+| `/info` | GET | Server information | Debugging |
+
+### Transport Mode Description
+
+#### Streamable HTTP Mode (for Dify)
+- **Endpoint**: `/mcp`
+- **Method**: POST
+- **Advantages**: Simple and direct, no session management required
+- **Suitable for**: Dify and other MCP clients that support Streamable HTTP
+
+#### SSE Mode (for n8n)
+- **Endpoint**: `/sse` + `/messages`
+- **Method**: GET (SSE) + POST (messages)
+- **Advantages**: Supports real-time bidirectional communication
+- **Suitable for**: n8n and other MCP clients that support SSE
+
+## Running Modes
+
+### HTTP Mode (Recommended, Multi-Platform Support)
+```bash
+npm run start:http
+```
+- **Hybrid Mode**: Supports both SSE and Streamable HTTP simultaneously
+- **Dify Compatible**: Supports Streamable HTTP via `/mcp` endpoint
+- **n8n Compatible**: Supports Server-Sent Events via `/sse` endpoint
+- **Multi-Transport**: One server supports both transport methods
+- **Health Check**: Provides `/health` endpoint
+- **Debug Tools**: Provides `/tools`, `/info`, `/sse-status` debug endpoints
+
+### Stdio Mode (Cursor Editor and Command Line Tools)
+```bash
+npm start
+```
+- **Standard Input/Output Mode**: Direct communication via stdin/stdout
+- **Cursor Compatible**: Suitable for Cursor editor MCP integration
+- **Command Line Tools**: Suitable for scripts and command line MCP clients
+- **Lightweight**: No HTTP server required, minimal resource usage
+
+### Mode Selection Guide
+
+| Purpose | Recommended Mode | Command | Endpoint |
+|---------|------------------|---------|----------|
+| Dify Integration | HTTP | `npm run start:http` | `/mcp` |
+| n8n Integration | HTTP | `npm run start:http` | `/sse` |
+| Cursor Editor | Stdio | `npm start` | - |
+| Command Line Tools | Stdio | `npm start` | - |
+| Development Debug | HTTP | `npm run start:http` | `/health`, `/tools` |
+
+## Troubleshooting
+
+### Dify Connection Issues
+
+#### 1. Check if MCP Server is Running Properly
+```bash
+curl http://localhost:3001/health
+```
+
+#### 2. Test Streamable HTTP Endpoint
+```bash
+curl -X POST http://localhost:3001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "id": 1,
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test", "version": "1.0.0"}
+    }
+  }'
+```
+
+#### 3. Common Error Solutions
+
+**Error**: `'NoneType' is not iterable`
+- **Cause**: Old version MCP Server response format issue
+- **Solution**: Update to v2.1.4 or newer version
+
+**Error**: `Method not found: notifications/initialized`
+- **Cause**: Incomplete MCP protocol implementation
+- **Solution**: Ensure using latest version and use `streamable_http` transport
+
+**Error**: `400 Bad Request`
+- **Cause**: Incorrect configuration URL
+- **Solution**: Confirm URL points to `/mcp` endpoint, not `/sse`
+
+#### 4. Dify Configuration Checklist
+- [ ] transport set to `"streamable_http"`
+- [ ] URL points to `/mcp` endpoint
+- [ ] Server responds normally to health check
+- [ ] Firewall not blocking the corresponding port
+- [ ] MCP RESOURCES AS TOOLS set to True
 
 ## Tool Documentation
 

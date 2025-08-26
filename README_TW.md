@@ -1,11 +1,11 @@
 # Kubernetes & Helm MCP Server
 
-一個簡單、可靠的 MCP (Model Context Protocol) Server，專為 Kubernetes 和 Helm 環境管理，支援 n8n 整合。
+一個簡單、可靠的 MCP (Model Context Protocol) Server，專為 Kubernetes 和 Helm 環境管理，支援 n8n 和 Dify 整合。
 
 ## 特色
 
-- **n8n 原生支援** - 完美支援 n8n MCP Client 節點
-- **SSE 連接** - 使用 Server-Sent Events 提供即時雙向通訊
+- **多平台支援** - 完美支援 n8n 和 Dify MCP 客戶端
+- **雙傳輸模式** - 支援 SSE 和 Streamable HTTP 兩種傳輸協議
 - **Kubernetes 整合** - 提供完整的 kubectl 工具存取
 - **Helm 支援** - 提供 Helm chart 和 release 管理功能
 - **模組化架構** - 清晰的入口點和伺服器分離設計
@@ -14,15 +14,18 @@
 - **資源監控** - 完整的資源使用監控功能
 - **標籤篩選** - 強大的標籤篩選和搜尋功能
 - **多資源支援** - 支援 19 種不同的 Kubernetes 資源類型
+- **MCP 協議相容** - 完全符合 MCP 2024-11-05 協議規範
 
 ## 版本資訊
 
-- **當前版本**: 2.1.3
+- **當前版本**: 2.1.4
 - **完成度**: 100%
-- **支援工具**: 16 個主要工具
+- **支援工具**: 17 個主要工具
 - **錯誤處理**: 全面完成重構
 - **認證機制**: GKE 叢集認證整合
 - **安全機制**: kubectl/helm 危險操作阻止
+- **Dify 相容性**: 完全支援 Streamable HTTP 傳輸
+- **n8n 相容性**: 完全支援 SSE 傳輸
 
 ## 檔案結構
 
@@ -194,6 +197,70 @@ services:
     environment:
       - NODE_ENV=production
     restart: unless-stopped
+```
+
+## 在 Dify 中使用
+
+### 第一步：啟動 MCP Server
+
+確保 MCP Server 在 HTTP 模式下運行：
+
+```bash
+cd k8s-mcp/k8s-mcp-server
+npm run start:http -- --port 3001
+```
+
+伺服器啟動後，你會看到：
+
+```
+MCP Server 已啟動在 http://localhost:3001
+MCP (Streamable HTTP): http://localhost:3001/mcp (Dify compatible)
+SSE 端點: http://localhost:3001/sse (n8n compatible)
+健康檢查: http://localhost:3001/health
+Hybrid mode - supports both SSE and Streamable HTTP transport
+```
+
+### 第二步：設定 Dify MCP 配置
+
+在 Dify 的 MCP SERVERS CONFIG 中添加：
+
+```json
+{
+  "k8s-mcp-server": {
+    "transport": "streamable_http",
+    "url": "http://k8s-all-in-one-kubectl-mcp-tool.n8n:3000/mcp",
+    "timeout": 30
+  }
+}
+```
+
+**重要配置說明**：
+- **transport**: 必須使用 `"streamable_http"`（推薦）
+- **url**: 指向您的 MCP Server 的 `/mcp` 端點
+- **timeout**: 建議設為 30 秒
+
+### 第三步：在 Dify 工作流程中使用
+
+1. **在工作流程中添加代理節點**
+2. **設定 MCP RESOURCES AS TOOLS 為 True**
+3. **設定 MCP PROMPTS AS TOOLS 為 True**
+4. **工具會自動載入到代理中**
+
+### 第四步：使用範例
+
+**取得 Pod 列表**：
+```
+請幫我查看 default 命名空間中的所有 Pod
+```
+
+**查看節點資源使用情況**：
+```
+請顯示所有節點的 CPU 和記憶體使用情況
+```
+
+**擴縮 Deployment**：
+```
+請將 my-web-app 的 Deployment 擴容到 3 個副本
 ```
 
 ## 在 n8n 中使用
@@ -2597,13 +2664,75 @@ REVISION    UPDATED                     STATUS        CHART           APP VERSIO
 
 ## API 端點
 
-| 端點 | 方法 | 描述 |
-|------|------|------|
-| `/health` | GET | 健康檢查 |
-| `/sse` | GET | SSE 連接端點 (n8n 連接) |
-| `/messages` | POST | MCP 訊息處理端點 |
+| 端點 | 方法 | 描述 | 用途 |
+|------|------|------|------|
+| `/health` | GET | 健康檢查 | 服務狀態檢查 |
+| `/mcp` | POST/GET | MCP Streamable HTTP 端點 | Dify 連接 |
+| `/sse` | GET | SSE 連接端點 | n8n 連接 |
+| `/messages` | POST | MCP 訊息處理端點 | SSE 模式訊息處理 |
+| `/sse-status` | GET | SSE 連接狀態監控 | 除錯用 |
+| `/tools` | GET | 工具列表 | 除錯用 |
+| `/info` | GET | 伺服器資訊 | 除錯用 |
+
+### 傳輸模式說明
+
+#### Streamable HTTP 模式（Dify 用）
+- **端點**: `/mcp`
+- **方法**: POST
+- **優點**: 簡單直接，無需會話管理
+- **適用**: Dify 和其他支援 Streamable HTTP 的 MCP 客戶端
+
+#### SSE 模式（n8n 用）
+- **端點**: `/sse` + `/messages`
+- **方法**: GET (SSE) + POST (訊息)
+- **優點**: 支援即時雙向通訊
+- **適用**: n8n 和其他支援 SSE 的 MCP 客戶端
 
 ## 疑難排解
+
+### Dify 連接問題
+
+#### 1. 檢查 MCP Server 是否正常運行
+```bash
+curl http://localhost:3001/health
+```
+
+#### 2. 測試 Streamable HTTP 端點
+```bash
+curl -X POST http://localhost:3001/mcp \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "method": "initialize",
+    "id": 1,
+    "params": {
+      "protocolVersion": "2024-11-05",
+      "capabilities": {},
+      "clientInfo": {"name": "test", "version": "1.0.0"}
+    }
+  }'
+```
+
+#### 3. 常見錯誤解決方案
+
+**錯誤**: `'NoneType' is not iterable`
+- **原因**: 舊版本 MCP Server 回應格式問題
+- **解決**: 更新到 v2.1.4 或更新版本
+
+**錯誤**: `Method not found: notifications/initialized`
+- **原因**: MCP 協議實現不完整
+- **解決**: 確保使用最新版本，並使用 `streamable_http` 傳輸
+
+**錯誤**: `400 Bad Request`
+- **原因**: 配置 URL 不正確
+- **解決**: 確認 URL 指向 `/mcp` 端點，不是 `/sse`
+
+#### 4. Dify 配置檢查清單
+- [ ] transport 設為 `"streamable_http"`
+- [ ] URL 指向 `/mcp` 端點
+- [ ] 服務器能正常回應健康檢查
+- [ ] 防火牆未阻擋對應端口
+- [ ] MCP RESOURCES AS TOOLS 設為 True
 
 ### n8n 連接失敗
 
@@ -2645,21 +2774,35 @@ http://k8s-mcp-server-service:3001/sse
 
 ## 運行模式
 
-### SSE 模式 (推薦，n8n 專用)
+### HTTP 模式 (推薦，支援多平台)
 ```bash
 npm run start:http
 ```
-- 支援 Server-Sent Events
-- 專為 n8n MCP Client 設計
-- 提供即時雙向通訊
+- **Hybrid 模式**: 同時支援 SSE 和 Streamable HTTP
+- **Dify 相容**: 透過 `/mcp` 端點支援 Streamable HTTP
+- **n8n 相容**: 透過 `/sse` 端點支援 Server-Sent Events
+- **多傳輸協議**: 一個伺服器同時支援兩種傳輸方式
+- **健康檢查**: 提供 `/health` 端點
+- **除錯工具**: 提供 `/tools`, `/info`, `/sse-status` 等除錯端點
 
 ### Stdio 模式 (Cursor 編輯器和命令列工具)
 ```bash
 npm start
 ```
-- 標準輸入/輸出模式
-- 適用於 Cursor 編輯器和命令列 MCP 客戶端
-- 輕量級，適合腳本使用
+- **標準輸入/輸出模式**: 直接透過 stdin/stdout 通訊
+- **Cursor 相容**: 適用於 Cursor 編輯器 MCP 整合
+- **命令列工具**: 適合腳本和命令列 MCP 客戶端
+- **輕量級**: 無需 HTTP 伺服器，資源占用最小
+
+### 模式選擇指南
+
+| 用途 | 推薦模式 | 命令 | 端點 |
+|------|----------|------|------|
+| Dify 整合 | HTTP | `npm run start:http` | `/mcp` |
+| n8n 整合 | HTTP | `npm run start:http` | `/sse` |
+| Cursor 編輯器 | Stdio | `npm start` | - |
+| 命令列工具 | Stdio | `npm start` | - |
+| 開發除錯 | HTTP | `npm run start:http` | `/health`, `/tools` |
 
 ## Cursor 編輯器配置
 

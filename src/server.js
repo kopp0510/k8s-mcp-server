@@ -284,8 +284,107 @@ function createMCPHandler(tools, availableTools) {
 
   return async (message) => {
     try {
+      // === MCP 協議生命週期處理 ===
+
+      // Process initialization request (必須首先處理)
+      if (message.method === 'initialize') {
+        logger.info('Received initialize request', message.params);
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            protocolVersion: '2024-11-05',
+            capabilities: {
+              tools: {}
+            },
+            serverInfo: {
+              name: 'kubernetes-mcp-server',
+              version: '1.0.0'
+            }
+          }
+        };
+      }
+
+      // Process initialized notification (修正 - 必需！)
+      if (message.method === 'notifications/initialized') {
+        logger.info('Client initialized successfully', {
+          messageId: message.id,
+          params: message.params,
+          fullMessage: message
+        });
+
+        // 根據 MCP 協議，notifications/initialized 不應該有 id
+        // 如果有 id，則不是標準的通知格式
+        if (message.id !== undefined && message.id !== null) {
+          logger.warn('notifications/initialized should not have id, treating as malformed request');
+          // 返回成功響應給帶有 id 的錯誤格式請求
+          return {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: {}  // 空物件而不是 null
+          };
+        }
+
+        // 對於正確的通知格式（無 id），返回空響應而不是 null (Dify 相容性)
+        logger.info('Standard notification received, returning empty response for Dify compatibility');
+        return {
+          jsonrpc: '2.0',
+          result: null
+        };
+      }
+
+      // Process other notifications (改善)
+      if (message.method && message.method.startsWith('notifications/')) {
+        logger.info(`Received notification: ${message.method}`, {
+          params: message.params,
+          hasId: message.id !== undefined
+        });
+
+        // 處理其他可能的通知
+        switch (message.method) {
+          case 'notifications/cancelled':
+            logger.info('Request cancelled by client');
+            break;
+          case 'notifications/progress':
+            logger.info('Progress notification received');
+            break;
+          default:
+            logger.warn(`Unknown notification: ${message.method}`);
+            // 對於未知通知，如果有 id 則返回錯誤響應
+            if (message.id !== undefined && message.id !== null) {
+              return {
+                jsonrpc: '2.0',
+                id: message.id,
+                error: {
+                  code: -32601,
+                  message: `Unknown notification method: ${message.method}`
+                }
+              };
+            }
+        }
+
+        // 對於有 id 的通知（不符合標準但需要相容），返回成功響應
+        if (message.id !== undefined && message.id !== null) {
+          logger.info(`Notification with id received, returning ack response`);
+          return {
+            jsonrpc: '2.0',
+            id: message.id,
+            result: {}
+          };
+        }
+
+        // 標準通知返回空響應 (Dify 相容性)
+        return {
+          jsonrpc: '2.0',
+          result: null
+        };
+      }
+
+      // === 工具相關請求處理 ===
+
       // Process tools list request
       if (message.method === 'tools/list') {
+        logger.info('Returning tools list');
         return {
           jsonrpc: '2.0',
           id: message.id,
@@ -371,31 +470,73 @@ function createMCPHandler(tools, availableTools) {
         };
       }
 
-      // Process initialization request
-      if (message.method === 'initialize') {
+      // === 其他 MCP 方法處理 ===
+
+      // Process resources list request (可選支援)
+      if (message.method === 'resources/list') {
+        logger.info('Resources list requested');
         return {
           jsonrpc: '2.0',
           id: message.id,
           result: {
-            protocolVersion: '2024-11-05',
-            capabilities: {
-              tools: {}
-            },
-            serverInfo: {
-              name: 'kubernetes-mcp-server',
-              version: '1.0.0'
-            }
+            resources: []  // 目前不提供資源
           }
         };
       }
 
-      // Unknown method
+      // Process prompts list request (可選支援)
+      if (message.method === 'prompts/list') {
+        logger.info('Prompts list requested');
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            prompts: []  // 目前不提供提示模板
+          }
+        };
+      }
+
+      // Process ping (健康檢查)
+      if (message.method === 'ping') {
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: {
+            status: 'pong',
+            timestamp: Date.now(),
+            server: 'kubernetes-mcp-server'
+          }
+        };
+      }
+
+      // === 錯誤處理 ===
+
+      // Unknown method (改善日誌)
+      logger.warn(`Unknown method: ${message.method}`, {
+        messageId: message.id,
+        params: message.params,
+        fullMessage: JSON.stringify(message, null, 2)
+      });
+
+      // 更詳細的錯誤響應
       return {
         jsonrpc: '2.0',
-        id: message.id,
+        id: message.id || null,
         error: {
           code: -32601,
-          message: `Method not found: ${message.method}`
+          message: `Method not found: ${message.method}`,
+          data: {
+            availableMethods: [
+              'initialize',
+              'notifications/initialized',
+              'tools/list',
+              'tools/call',
+              'resources/list',
+              'prompts/list',
+              'ping'
+            ],
+            receivedMethod: message.method
+          }
         }
       };
 
@@ -435,7 +576,7 @@ function createMCPHandler(tools, availableTools) {
           }
         };
 
-        const response = {
+        return {
           jsonrpc: '2.0',
           id: message.id,
           result: prerequisiteErrorResponse // 使用 result 而不是 error
@@ -473,14 +614,28 @@ function createExpressApp(tools, availableTools) {
   // SSE connection management
   const sseConnections = new Map();
 
-  // Health check
+  // 添加 CORS 支持 (新增)
+  app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+
+    if (req.method === 'OPTIONS') {
+      res.sendStatus(200);
+    } else {
+      next();
+    }
+  });
+
+  // Health check (保持現有)
   app.get('/health', (req, res) => {
     res.json({
       status: 'healthy',
       service: 'k8s-mcp-server',
       version: '1.0.0',
       timestamp: new Date().toISOString(),
-      mode: 'sse',
+      mode: 'hybrid', // 改為 hybrid 模式
+      transports: ['sse', 'streamable_http'], // 支援的傳輸方式
       tools: availableTools.map(tool => ({
         name: tool.name,
         description: tool.description
@@ -488,9 +643,17 @@ function createExpressApp(tools, availableTools) {
     });
   });
 
-  // SSE endpoint - n8n will connect here
+  // SSE endpoint - n8n will connect here (改善除錯和健康狀態)
   app.get('/sse', (req, res) => {
     const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+    logger.info(`SSE connection request`, {
+      sessionId: sessionId,
+      userAgent: req.get('User-Agent'),
+      origin: req.get('Origin'),
+      referer: req.get('Referer'),
+      currentConnections: sseConnections.size
+    });
 
     // Set SSE headers
     res.writeHead(200, {
@@ -498,47 +661,132 @@ function createExpressApp(tools, availableTools) {
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'Cache-Control'
+      'Access-Control-Allow-Headers': 'Cache-Control',
+      'X-Session-ID': sessionId  // 新增 header 幫助除錯
     });
 
     // Store connection
     sseConnections.set(sessionId, res);
 
     // Send initial message - tell n8n message sending endpoint
+    res.write(`event: connected\n`);
+    res.write(`data: ${JSON.stringify({
+      sessionId: sessionId,
+      messageEndpoint: `/messages?sessionId=${sessionId}`,
+      timestamp: Date.now(),
+      serverInfo: {
+        name: 'kubernetes-mcp-server',
+        version: '1.0.0'
+      }
+    })}\n\n`);
+
+    // 發送端點資訊（為了向後相容）
     res.write(`event: endpoint\n`);
     res.write(`data: /messages?sessionId=${sessionId}\n\n`);
 
-    // Keep-alive ping
+    // Keep-alive ping (更頻繁，更多資訊)
     const pingInterval = setInterval(() => {
       if (sseConnections.has(sessionId)) {
-        res.write(`event: ping\n`);
-        res.write(`data: ${Date.now()}\n\n`);
+        try {
+          res.write(`event: ping\n`);
+          res.write(`data: ${JSON.stringify({
+            timestamp: Date.now(),
+            sessionId: sessionId,
+            activeConnections: sseConnections.size
+          })}\n\n`);
+        } catch (error) {
+          logger.warn(`Failed to send ping to session ${sessionId}:`, error.message);
+          sseConnections.delete(sessionId);
+          clearInterval(pingInterval);
+        }
       } else {
         clearInterval(pingInterval);
       }
-    }, 15000);
+    }, 10000); // 改為 10 秒一次
 
     // Handle connection closure
     req.on('close', () => {
-      logger.info(`SSE connection closed: ${sessionId}`);
+      logger.info(`SSE connection closed: ${sessionId}`, {
+        remainingConnections: sseConnections.size - 1
+      });
       sseConnections.delete(sessionId);
       clearInterval(pingInterval);
     });
 
-    logger.info(`SSE connection established: ${sessionId}`);
+    // Handle errors
+    req.on('error', (error) => {
+      logger.error(`SSE connection error: ${sessionId}`, error);
+      sseConnections.delete(sessionId);
+      clearInterval(pingInterval);
+    });
+
+    logger.info(`SSE connection established: ${sessionId}`, {
+      totalConnections: sseConnections.size
+    });
   });
 
   // Message endpoint - n8n will send MCP requests here
   const mcpHandler = createMCPHandler(tools, availableTools);
 
+  // Message endpoint - n8n will send MCP requests here (完全重構錯誤處理)
   app.post('/messages', async (req, res) => {
     const sessionId = req.query.sessionId;
-    const sseRes = sseConnections.get(sessionId);
 
+    logger.info(`Messages endpoint called`, {
+      sessionId: sessionId,
+      hasSessionId: !!sessionId,
+      activeConnections: sseConnections.size,
+      connectionIds: Array.from(sseConnections.keys()),
+      userAgent: req.get('User-Agent'),
+      contentType: req.get('Content-Type')
+    });
+
+    // 改進：如果沒有 sessionId，嘗試直接處理 (支援 Dify 直接調用)
+    if (!sessionId) {
+      try {
+        const message = req.body;
+        logger.info(`Direct MCP request to /messages (no sessionId): ${message?.method}`);
+
+        const response = await mcpHandler(message);
+        return res.json(response);
+
+      } catch (error) {
+        logger.error('Direct message processing failed:', error);
+        return res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: 'Internal server error' },
+          id: null
+        });
+      }
+    }
+
+    // SSE 會話處理 (改善錯誤處理)
+    const sseRes = sseConnections.get(sessionId);
     if (!sseRes) {
+      logger.warn(`SSE session not found`, {
+        requestedSessionId: sessionId,
+        activeConnections: Array.from(sseConnections.keys()),
+        totalConnections: sseConnections.size,
+        suggestion: 'Client should establish SSE connection first via /sse endpoint'
+      });
+
+      // 更友善的錯誤回應，包含建議
       return res.status(400).json({
         jsonrpc: '2.0',
-        error: { code: -32000, message: 'Invalid session' },
+        error: {
+          code: -32000,
+          message: 'Invalid or expired SSE session',
+          data: {
+            sessionId: sessionId,
+            activeConnections: sseConnections.size,
+            suggestion: 'Please establish SSE connection first via GET /sse endpoint',
+            endpoints: {
+              sse: '/sse',
+              direct: '/mcp',
+              health: '/health'
+            }
+          }
+        },
         id: null
       });
     }
@@ -566,6 +814,165 @@ function createExpressApp(tools, availableTools) {
     }
   });
 
+  // 1. MCP 端點 - 支援 POST 和 GET
+  app.all('/mcp', async (req, res) => {
+    try {
+      if (req.method === 'GET') {
+        // GET 請求 - 可用於建立 SSE 連線（如果需要的話）
+        const acceptHeader = req.get('Accept') || '';
+
+        if (acceptHeader.includes('text/event-stream')) {
+          // 客戶端想要 SSE 串流
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'Access-Control-Allow-Origin': '*'
+          });
+
+          // 發送初始化事件
+          res.write(`event: connected\n`);
+          res.write(`data: ${JSON.stringify({status: 'connected', timestamp: Date.now()})}\n\n`);
+
+          // 保持連線
+          const keepAlive = setInterval(() => {
+            res.write(`event: ping\n`);
+            res.write(`data: ${Date.now()}\n\n`);
+          }, 30000);
+
+          req.on('close', () => {
+            clearInterval(keepAlive);
+          });
+
+        } else {
+          // 普通 GET 請求 - 返回服務器信息
+          res.json({
+            jsonrpc: '2.0',
+            result: {
+              protocolVersion: '2024-11-05',
+              capabilities: {
+                tools: {}
+              },
+              serverInfo: {
+                name: 'kubernetes-mcp-server',
+                version: '1.0.0'
+              }
+            }
+          });
+        }
+
+      } else if (req.method === 'POST') {
+        // POST 請求 - 處理標準 MCP JSON-RPC 消息
+        const message = req.body;
+        const acceptHeader = req.get('Accept') || '';
+
+        logger.info(`Received MCP request via /mcp: ${message.method}`, {
+          transport: 'streamable_http',
+          acceptsSSE: acceptHeader.includes('text/event-stream')
+        });
+
+        const response = await mcpHandler(message);
+
+        // 檢查客戶端是否接受 SSE
+        if (acceptHeader.includes('text/event-stream')) {
+          // 返回 SSE 格式
+          res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          });
+
+          res.write(`event: message\n`);
+          res.write(`data: ${JSON.stringify(response)}\n\n`);
+          res.end();
+
+        } else {
+          // 返回標準 JSON 格式
+          res.json(response);
+        }
+
+      } else {
+        // 不支援的 HTTP 方法
+        res.status(405).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32000,
+            message: `Method ${req.method} not allowed`
+          },
+          id: null
+        });
+      }
+
+    } catch (error) {
+      logger.error('MCP endpoint error:', error);
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: `Internal server error: ${error.message}`
+        },
+        id: null
+      });
+    }
+  });
+
+  // === 新增：工具列表端點 (方便調試) ===
+  app.get('/tools', (req, res) => {
+    res.json({
+      jsonrpc: '2.0',
+      result: {
+        tools: availableTools
+      }
+    });
+  });
+
+  // === 新增：SSE 連接狀態端點 ===
+  app.get('/sse-status', (req, res) => {
+    const connections = Array.from(sseConnections.entries()).map(([sessionId, connection]) => ({
+      sessionId: sessionId,
+      connected: !connection.destroyed,
+      writable: connection.writable,
+      age: Date.now() - parseInt(sessionId.substring(0, 13)) // 從 sessionId 計算年齡
+    }));
+
+    res.json({
+      totalConnections: sseConnections.size,
+      connections: connections,
+      timestamp: Date.now(),
+      server: {
+        name: 'kubernetes-mcp-server',
+        version: '1.0.0'
+      }
+    });
+  });
+
+  // === 新增：服務器信息端點 ===
+  app.get('/info', (req, res) => {
+    res.json({
+      name: 'kubernetes-mcp-server',
+      version: '1.0.0',
+      protocolVersion: '2024-11-05',
+      transports: ['stdio', 'sse', 'streamable_http'],
+      endpoints: {
+        health: '/health',
+        mcp: '/mcp',
+        sse: '/sse',
+        'sse-status': '/sse-status',
+        messages: '/messages',
+        tools: '/tools',
+        info: '/info'
+      },
+      capabilities: {
+        tools: {},
+        resources: false,
+        prompts: false
+      },
+      statistics: {
+        activeSSEConnections: sseConnections.size,
+        availableTools: availableTools.length
+      }
+    });
+  });
   return { app, sseConnections };
 }
 
@@ -583,15 +990,19 @@ export async function createMCPServer(config) {
       // SSE mode (n8n compatible)
       const { app, sseConnections } = createExpressApp(tools, availableTools);
 
+      // 在 httpServer.listen 的回調中更新日誌：
       const httpServer = app.listen(port, () => {
         logger.info(`MCP Server started at http://localhost:${port}`);
-        logger.info(`SSE endpoint: http://localhost:${port}/sse (n8n connects here)`);
-        logger.info(`Message endpoint: http://localhost:${port}/messages`);
+        logger.info(`=== Endpoints ===`);
         logger.info(`Health check: http://localhost:${port}/health`);
+        logger.info(`MCP (Streamable HTTP): http://localhost:${port}/mcp (Dify compatible)`);
+        logger.info(`SSE endpoint: http://localhost:${port}/sse (n8n compatible)`);
+        logger.info(`Message endpoint: http://localhost:${port}/messages`);
+        logger.info(`Tools list: http://localhost:${port}/tools`);
+        logger.info(`Server info: http://localhost:${port}/info`);
         logger.info(`Available tools: ${availableTools.map(t => t.name).join(', ')}`);
-        logger.info(`SSE mode - specifically designed for n8n`);
+        logger.info(`Hybrid mode - supports both SSE and Streamable HTTP transport`);
       });
-
       // Return server instance for graceful shutdown
       return {
         close: async () => {
