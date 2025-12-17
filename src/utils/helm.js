@@ -76,6 +76,7 @@ export class HelmRunner {
 
       let stdout = '';
       let stderr = '';
+      let isTimedOut = false;
 
       helm.stdout.on('data', (data) => {
         stdout += data.toString();
@@ -86,6 +87,13 @@ export class HelmRunner {
       });
 
       helm.on('close', (code) => {
+        // 清理 timer
+        clearTimeout(timer);
+
+        if (isTimedOut) {
+          return; // 已經被超時處理
+        }
+
         if (stderr && !stdout) {
           logger.warn(`helm warning: ${stderr}`);
         }
@@ -109,13 +117,26 @@ export class HelmRunner {
       });
 
       helm.on('error', (error) => {
+        clearTimeout(timer);
+        if (isTimedOut) {
+          return;
+        }
         logger.error(`helm execution failed: ${command}`, error);
         reject(new Error(`helm execution failed: ${error.message}`));
       });
 
-      // Set timeout
-      setTimeout(() => {
+      // 設置超時 - 與 cluster-manager.js 保持一致
+      const timer = setTimeout(() => {
+        isTimedOut = true;
         helm.kill('SIGTERM');
+
+        // 如果 SIGTERM 無效，1秒後強制 SIGKILL
+        setTimeout(() => {
+          if (!helm.killed) {
+            helm.kill('SIGKILL');
+          }
+        }, 1000);
+
         reject(new Error('helm command timeout'));
       }, this.timeout);
     });

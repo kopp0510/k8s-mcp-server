@@ -605,9 +605,15 @@ function createMCPHandler(tools, availableTools) {
 /**
  * Create Express application (SSE mode)
  */
+// 配置常數
+const MAX_REQUEST_SIZE = '1mb';  // 請求大小限制
+const MAX_SSE_CONNECTIONS = 100; // SSE 最大連接數
+
 function createExpressApp(tools, availableTools) {
   const app = express();
-  app.use(express.json());
+
+  // 安全性：限制請求大小，防止記憶體溢出攻擊
+  app.use(express.json({ limit: MAX_REQUEST_SIZE }));
 
   // SSE connection management
   const sseConnections = new Map();
@@ -643,6 +649,18 @@ function createExpressApp(tools, availableTools) {
 
   // SSE endpoint - n8n will connect here (改善除錯和健康狀態)
   app.get('/sse', (req, res) => {
+    // 安全性：限制 SSE 連接數量，防止資源耗盡
+    if (sseConnections.size >= MAX_SSE_CONNECTIONS) {
+      logger.warn(`SSE connection rejected: max connections reached`, {
+        currentConnections: sseConnections.size,
+        maxConnections: MAX_SSE_CONNECTIONS
+      });
+      return res.status(503).json({
+        error: 'Service temporarily unavailable',
+        message: `Maximum SSE connections (${MAX_SSE_CONNECTIONS}) reached. Please try again later.`
+      });
+    }
+
     const sessionId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
 
     logger.info(`SSE connection request`, {
