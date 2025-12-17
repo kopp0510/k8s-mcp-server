@@ -184,7 +184,8 @@ export class ClusterManager {
     try {
       // Check if service account key file exists
       if (!fs.existsSync(cluster.keyFile)) {
-        throw new Error(`Service account key file not found: ${cluster.keyFile}`);
+        // 安全性：只顯示檔案名稱，不顯示完整路徑
+        throw new Error(`Service account key file not found: ${path.basename(cluster.keyFile)}`);
       }
 
       // 1. Service account authentication
@@ -274,7 +275,8 @@ export class ClusterManager {
       } else if (cluster.type === 'local') {
         // For local type, check if kubeconfig exists
         if (!fs.existsSync(cluster.kubeconfig)) {
-          throw new Error(`Kubeconfig file not found: ${cluster.kubeconfig}`);
+          // 安全性：只顯示檔案名稱，不顯示完整路徑
+          throw new Error(`Kubeconfig file not found: ${path.basename(cluster.kubeconfig)}`);
         }
 
         // If specified context, switch to that context
@@ -310,16 +312,40 @@ export class ClusterManager {
   async executeCommand(command, args, options = {}) {
     const timeout = options.timeout || this.clusters.configuration?.gke_auth_timeout || 300;
 
+    // 安全性：只允許執行白名單中的命令
+    const ALLOWED_COMMANDS = ['kubectl', 'helm', 'gcloud'];
+    if (!ALLOWED_COMMANDS.includes(command)) {
+      throw new Error(`Command not allowed: ${command}`);
+    }
+
     return new Promise((resolve, reject) => {
       logger.debug(`Executing command: ${command} ${args.join(' ')}`);
 
+      // 安全性：使用環境變數白名單，避免繼承潛在危險的環境變數
+      const safeEnv = {
+        PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
+        HOME: process.env.HOME,
+        USER: process.env.USER,
+        KUBECONFIG: process.env.KUBECONFIG,
+        GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        CLOUDSDK_CONFIG: process.env.CLOUDSDK_CONFIG,
+        USE_GKE_GCLOUD_AUTH_PLUGIN: 'True',
+        // Node.js 相關
+        NODE_ENV: process.env.NODE_ENV,
+        // 時區
+        TZ: process.env.TZ
+      };
+
+      // 移除 undefined 值
+      Object.keys(safeEnv).forEach(key => {
+        if (safeEnv[key] === undefined) {
+          delete safeEnv[key];
+        }
+      });
+
       const childProcess = spawn(command, args, {
         stdio: 'pipe',
-        env: {
-          ...process.env,
-          PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
-          USE_GKE_GCLOUD_AUTH_PLUGIN: 'True'
-        },
+        env: safeEnv,
         ...options
       });
 
@@ -555,7 +581,8 @@ export class ClusterManager {
     // Check local cluster kubeconfig file
     if (cluster.type === 'local') {
       if (!fs.existsSync(cluster.kubeconfig)) {
-        throw new Error(`Local cluster '${clusterId}' kubeconfig file does not exist: ${cluster.kubeconfig}`);
+        // 安全性：只顯示檔案名稱，不顯示完整路徑
+        throw new Error(`Local cluster '${clusterId}' kubeconfig file does not exist: ${path.basename(cluster.kubeconfig)}`);
       }
     }
   }

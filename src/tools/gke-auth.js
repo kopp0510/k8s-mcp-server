@@ -3,6 +3,7 @@
  * Authenticate to GKE cluster using service account and get cluster credentials
  */
 
+import path from 'path';
 import { BaseTool } from './base-tool.js';
 import { clusterManager } from '../utils/cluster-manager.js';
 
@@ -81,7 +82,8 @@ export class GkeAuthTool extends BaseTool {
     result += `• Project: ${cluster.project}\n`;
     result += `• Cluster: ${cluster.cluster}\n`;
     result += `• Region: ${cluster.region}\n`;
-    result += `• Key File: ${cluster.keyFile}\n\n`;
+    // 安全性：只顯示檔案名稱，不顯示完整路徑
+    result += `• Key File: ${path.basename(cluster.keyFile)}\n\n`;
 
     try {
       // Perform authentication
@@ -130,7 +132,8 @@ export class GkeAuthTool extends BaseTool {
       result += `• Error: ${error.message}\n\n`;
 
       result += `**Troubleshooting:**\n`;
-      result += `• Check if service account key file exists: ${cluster.keyFile}\n`;
+      // 安全性：只顯示檔案名稱，不顯示完整路徑
+      result += `• Check if service account key file exists: ${path.basename(cluster.keyFile)}\n`;
       result += `• Verify service account has required permissions\n`;
       result += `• Confirm cluster name and region are correct\n`;
       result += `• Check network connectivity to GCP\n`;

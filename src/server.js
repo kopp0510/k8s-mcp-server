@@ -576,19 +576,17 @@ function createMCPHandler(tools, availableTools) {
           }
         };
 
-        return {
-          jsonrpc: '2.0',
-          id: message.id,
-          result: prerequisiteErrorResponse // 使用 result 而不是 error
-        };
-
         logger.info(`前置條件錯誤已轉換為工具回應，AI agent 可以處理`, {
           responseType: 'ToolResponse',
           errorType: 'PrerequisiteError',
           forwardedToAgent: true
         });
 
-        return response;
+        return {
+          jsonrpc: '2.0',
+          id: message.id,
+          result: prerequisiteErrorResponse // 使用 result 而不是 error
+        };
       }
 
       // 一般執行錯誤
