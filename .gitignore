@@ -49,9 +49,8 @@ Thumbs.db
 Desktop.ini
 
 # === 測試檔案 ===
-test*
-test-*
-*.test.js
+# 保留 tests/ 目錄但忽略根目錄的測試腳本
+/test-*.js
 coverage/
 *.lcov
 .nyc_output/
