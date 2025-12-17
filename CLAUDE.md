@@ -27,13 +27,48 @@
 
 ## DD 流程設定
 
+> **規範文檔位置**: `~/.claude/commands/dd-*.md`
+> **查看完整說明**: 執行 `/dd-help`
+
 ### 啟用的文檔驅動方法
-- [x] **RDD** - 需求驅動開發（Requirements-Driven Development）
-- [x] **SDD** - 規格驅動開發（Specification-Driven Development）
-- [x] **DDD** - 領域驅動設計（Domain-Driven Design）
-- [x] **DbC** - 契約式設計（Design by Contract）
-- [x] **ADD** - 架構決策記錄（Architecture Decision Records）
-- [x] **EDD** - 範例驅動開發（Example-Driven Development）
+
+| 階段 | DD 模式 | 說明 |
+|------|---------|------|
+| 需求分析 | **RDD** | 需求驅動開發 |
+| 架構設計 | **SDD + DDD + ADD + EDD** | 規格/領域/決策/範例 |
+| 開發實作 | **DbC + CDD + PDD** | 契約/組件/提示詞 |
+| 測試審查 | **TDD + BDD + ATDD + FDD** | 測試/行為/驗收/失敗 |
+
+### DD 命令速查
+
+| 命令 | 說明 |
+|------|------|
+| `/dd-help` | 顯示完整使用手冊 |
+| `/dd-init` | 初始化專案結構 |
+| `/dd-start <需求>` | 啟動流程（需求分析） |
+| `/dd-arch` | 進入架構設計 |
+| `/dd-approve` | 確認架構，開始自動開發 |
+| `/dd-revise` | 修改架構設計 |
+| `/dd-dev` | 手動觸發開發 |
+| `/dd-test` | 手動觸發測試 |
+| `/dd-status` | 查看目前進度 |
+| `/dd-stop` | 中斷流程 |
+
+### DD 流程圖
+
+```
+/dd-init → /dd-start → /dd-arch → ⏸️ 等待確認
+                                       │
+                 ┌─────────────────────┴──────────────────┐
+                 │                                        │
+            /dd-approve                              /dd-revise
+                 │                                        │
+                 ▼                                        │
+           自動開發測試 ◀─────────────────────────────────┘
+                 │
+                 ▼
+        ✅ 完成 或 ❌ 失敗重試
+```
 
 ### 開發模式
 - **模式**: 後端 API / MCP 伺服器
