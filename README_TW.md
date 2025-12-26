@@ -62,8 +62,8 @@ k8s-mcp-server/
 ├── Dockerfile                     # Docker 容器建構檔案
 ├── build.sh                       # Docker 建構腳本
 ├── .gitignore                     # Git 忽略檔案配置
-├── .cursorignore                  # Cursor 編輯器忽略檔案配置
-└── README.md                      # 專案說明文檔
+├── README.md                      # 專案文檔（英文）
+└── README_TW.md                   # 專案文檔（繁體中文）
 ```
 
 ### 架構說明
@@ -196,7 +196,51 @@ services:
       - ~/.kube/config:/home/nodejs/.kube/config:ro
     environment:
       - NODE_ENV=production
+      - MCP_OUTPUT_MODE=compact
     restart: unless-stopped
+```
+
+## 環境變數
+
+| 變數 | 說明 | 可用值 | 預設值 |
+|------|------|--------|--------|
+| `MCP_OUTPUT_MODE` | 控制工具回應的詳細程度，用於優化 token 使用量 | `compact`, `normal`, `verbose` | `normal` |
+| `NODE_ENV` | Node.js 環境 | `development`, `production` | - |
+| `LOG_LEVEL` | 日誌級別 | `debug`, `info`, `warn`, `error` | `info` |
+| `PORT` | HTTP 伺服器埠號 | 任何有效埠號 | `3000` |
+
+### MCP_OUTPUT_MODE 詳細說明
+
+`MCP_OUTPUT_MODE` 環境變數控制工具回應中包含多少細節：
+
+| 模式 | Token 使用量 | 說明 |
+|------|-------------|------|
+| `compact` | ~4% | 最精簡輸出，只包含核心數據。最適合節省 token 成本。 |
+| `normal` | ~94% | 平衡的輸出，包含關鍵細節。預設模式。 |
+| `verbose` | 100% | 完整輸出，包含提示和範例。最適合除錯。 |
+
+**回應大小範例（kubectl_get pods）：**
+- `compact`: ~675 字元
+- `normal`: ~17,482 字元
+- `verbose`: ~18,586 字元
+
+**使用方式：**
+```bash
+# 透過環境變數設定
+export MCP_OUTPUT_MODE=compact
+npm run start:http
+
+# 或在 Docker 中
+docker run -e MCP_OUTPUT_MODE=compact -p 3001:3000 k8s-mcp-server
+
+# 或透過工具參數覆蓋（單次請求）
+{
+  "name": "kubectl_get",
+  "arguments": {
+    "resource": "pods",
+    "outputMode": "verbose"  // 覆蓋此次請求的輸出模式
+  }
+}
 ```
 
 ## 在 Dify 中使用
@@ -2960,19 +3004,19 @@ npm start
 
 ### 測試指南
 
-1. **執行測試**:
+1. **執行單元測試**:
    ```bash
    npm test
    ```
 
-2. **檢查程式碼風格**:
-   ```bash
-   npm run lint
-   ```
-
-3. **執行整合測試**:
+2. **執行整合測試**:
    ```bash
    npm run test:integration
+   ```
+
+3. **執行所有測試**:
+   ```bash
+   npm run test:all
    ```
 
 ### 文件貢獻

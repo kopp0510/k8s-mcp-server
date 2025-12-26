@@ -62,8 +62,8 @@ k8s-mcp-server/
 ├── Dockerfile                     # Docker container build file
 ├── build.sh                       # Docker build script
 ├── .gitignore                     # Git ignore file configuration
-├── .cursorignore                  # Cursor editor ignore file configuration
-└── README.md                      # Project documentation
+├── README.md                      # Project documentation (English)
+└── README_TW.md                   # Project documentation (Traditional Chinese)
 ```
 
 ### Architecture Description
@@ -258,7 +258,51 @@ services:
       - ~/.kube/config:/home/nodejs/.kube/config:ro
     environment:
       - NODE_ENV=production
+      - MCP_OUTPUT_MODE=compact
     restart: unless-stopped
+```
+
+## Environment Variables
+
+| Variable | Description | Values | Default |
+|----------|-------------|--------|---------|
+| `MCP_OUTPUT_MODE` | Controls the verbosity of tool responses to optimize token usage | `compact`, `normal`, `verbose` | `normal` |
+| `NODE_ENV` | Node.js environment | `development`, `production` | - |
+| `LOG_LEVEL` | Logging level | `debug`, `info`, `warn`, `error` | `info` |
+| `PORT` | HTTP server port | Any valid port number | `3000` |
+
+### MCP_OUTPUT_MODE Details
+
+The `MCP_OUTPUT_MODE` environment variable controls how much detail is included in tool responses:
+
+| Mode | Token Usage | Description |
+|------|-------------|-------------|
+| `compact` | ~4% | Minimal output with only essential data. Best for reducing token costs. |
+| `normal` | ~94% | Balanced output with key details. Default mode. |
+| `verbose` | 100% | Full output including tips and examples. Best for debugging. |
+
+**Example Response Sizes (kubectl_get pods):**
+- `compact`: ~675 characters
+- `normal`: ~17,482 characters
+- `verbose`: ~18,586 characters
+
+**Usage:**
+```bash
+# Set via environment variable
+export MCP_OUTPUT_MODE=compact
+npm run start:http
+
+# Or in Docker
+docker run -e MCP_OUTPUT_MODE=compact -p 3001:3000 k8s-mcp-server
+
+# Or override per-request via tool parameter
+{
+  "name": "kubectl_get",
+  "arguments": {
+    "resource": "pods",
+    "outputMode": "verbose"  // Override for this request
+  }
+}
 ```
 
 ## Using with Dify
@@ -621,9 +665,8 @@ npm install
 
 3. **Run Tests**
 ```bash
-npm test            # Basic tests
-npm run test:labels # Label filtering tests
-npm run test:all    # All tests
+npm test            # Unit tests
+npm run test:all    # All tests (unit + integration)
 ```
 
 ### Development Guidelines
