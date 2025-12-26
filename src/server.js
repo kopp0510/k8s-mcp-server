@@ -722,18 +722,19 @@ function createExpressApp(tools, availableTools) {
 
     // Handle connection closure
     req.on('close', () => {
-      logger.info(`SSE connection closed: ${sessionId}`, {
-        remainingConnections: sseConnections.size - 1
-      });
-      sseConnections.delete(sessionId);
       clearInterval(pingInterval);
+      if (sseConnections.has(sessionId)) {
+        sseConnections.delete(sessionId);
+        logger.info(`SSE connection closed: ${sessionId}`, {
+          remainingConnections: sseConnections.size
+        });
+      }
     });
 
-    // Handle errors
+    // Handle errors - 只記錄錯誤，讓 close 事件統一處理清理
     req.on('error', (error) => {
       logger.error(`SSE connection error: ${sessionId}`, error);
-      sseConnections.delete(sessionId);
-      clearInterval(pingInterval);
+      // 不在這裡刪除連線，避免與 close 事件重複處理
     });
 
     logger.info(`SSE connection established: ${sessionId}`, {

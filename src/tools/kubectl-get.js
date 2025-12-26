@@ -1,4 +1,4 @@
-import { BaseTool } from './base-tool.js';
+import { BaseTool, OUTPUT_MODES, DEFAULT_OUTPUT_MODE } from './base-tool.js';
 import { kubectl } from '../utils/kubectl.js';
 import { validator } from '../utils/validator.js';
 
@@ -44,6 +44,11 @@ export class KubectlGetTool extends BaseTool {
             type: 'string',
             description: 'Target cluster ID (optional, uses default cluster if not specified)',
           },
+          outputMode: {
+            type: 'string',
+            enum: ['compact', 'normal', 'verbose'],
+            description: 'Output detail level: compact (minimal, saves tokens), normal (balanced), verbose (full details). Default from MCP_OUTPUT_MODE env',
+          },
         },
         required: ['resource'],
       },
@@ -83,7 +88,7 @@ export class KubectlGetTool extends BaseTool {
     try {
       validator.validateInput(args, this.getDefinition().inputSchema);
 
-      const { resource, namespace, allNamespaces, name, labelSelector, labels, cluster } = args;
+      const { resource, namespace, allNamespaces, name, labelSelector, labels, cluster, outputMode = DEFAULT_OUTPUT_MODE } = args;
 
       // Validate cluster ID (if provided)
       if (cluster) {
@@ -163,6 +168,7 @@ export class KubectlGetTool extends BaseTool {
       }
 
       // Log successful execution details
+      const itemCount = jsonData.items ? jsonData.items.length : (jsonData.kind ? 1 : 0);
       const logDetails = {
         resource,
         namespace: namespace || 'default',
@@ -170,15 +176,35 @@ export class KubectlGetTool extends BaseTool {
         name,
         labelSelector: finalLabelSelector,
         cluster: cluster || 'default',
-        itemCount: jsonData.items ? jsonData.items.length : (jsonData.kind ? 1 : 0)
+        itemCount,
+        outputMode
       };
 
-      this.logSuccess(args, { content: [{ text: `Found ${logDetails.itemCount} resources` }] });
+      this.logSuccess(args, { content: [{ text: `Found ${itemCount} resources` }] });
+
+      // 根據 outputMode 處理輸出
+      let outputData;
+      switch (outputMode) {
+        case 'compact':
+          // 精簡模式：只返回摘要
+          outputData = this.createResourceSummary(jsonData);
+          break;
+        case 'verbose':
+          // 詳細模式：只移除 managedFields
+          outputData = this.filterK8sMetadata(jsonData, OUTPUT_MODES.VERBOSE);
+          break;
+        case 'normal':
+        default:
+          // 標準模式：移除冗餘 metadata
+          outputData = this.filterK8sMetadata(jsonData, OUTPUT_MODES.NORMAL);
+          break;
+      }
+
       return {
         content: [
           {
             type: 'json',
-            json: jsonData
+            json: outputData
           }
         ]
       };

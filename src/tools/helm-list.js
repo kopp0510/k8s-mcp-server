@@ -3,7 +3,7 @@
  * List Helm releases
  */
 
-import { BaseTool } from './base-tool.js';
+import { BaseTool, OUTPUT_MODES, DEFAULT_OUTPUT_MODE } from './base-tool.js';
 import { helm } from '../utils/helm.js';
 import { logger } from '../utils/logger.js';
 import { validator } from '../utils/validator.js';
@@ -63,6 +63,11 @@ export class HelmListTool extends BaseTool {
           cluster: {
             type: 'string',
             description: 'Target cluster ID (optional, uses default cluster if not specified)',
+          },
+          outputMode: {
+            type: 'string',
+            enum: ['compact', 'normal', 'verbose'],
+            description: 'Output detail level: compact (table only), normal (table + count), verbose (full details with tips). Default from MCP_OUTPUT_MODE env',
           }
         },
         required: []
@@ -126,10 +131,12 @@ export class HelmListTool extends BaseTool {
       // Execute command (pass cluster parameter)
       const output = await helm.execute(command, cluster);
 
-      // Format output
+      // Format output with outputMode support
+      const outputMode = args.outputMode || DEFAULT_OUTPUT_MODE;
       const formattedOutput = this.formatListOutput(output, {
         ...args,
-        allNamespaces: effectiveAllNamespaces
+        allNamespaces: effectiveAllNamespaces,
+        outputMode
       });
 
       this.logSuccess(args, { content: [{ text: formattedOutput }] });
@@ -293,12 +300,23 @@ export class HelmListTool extends BaseTool {
       result += `Name filtering: ${args.filter}\n`;
     }
 
-    // Statistics information
-    result += `Found ${dataLines.length} Helm releases`;
-    if (args.status && args.status.trim() !== '') {
-      result += ` (only ${args.status} status)`;
+    const outputMode = args.outputMode || DEFAULT_OUTPUT_MODE;
+
+    // compact 模式：只顯示表格
+    if (outputMode === 'compact') {
+      dataLines.forEach(line => {
+        const fields = line.split('\t').map(f => f.trim());
+        if (fields.length >= 6) {
+          const [name, namespace, revision, updated, status, chart, appVersion] = fields;
+          result += `${name.padEnd(20)} ${namespace.padEnd(12)} ${status.padEnd(10)} ${chart}\n`;
+        }
+      });
+      result += `\n${dataLines.length} releases`;
+      return result;
     }
-    result += `:\n\n`;
+
+    // normal 和 verbose 模式的統計資訊
+    result += `Found ${dataLines.length} Helm releases:\n\n`;
 
     // Table title
     result += `${'NAME'.padEnd(20)} ${'NAMESPACE'.padEnd(15)} ${'REVISION'.padEnd(8)} ${'STATUS'.padEnd(12)} ${'CHART'.padEnd(30)} APP VERSION\n`;
@@ -311,24 +329,25 @@ export class HelmListTool extends BaseTool {
         const [name, namespace, revision, updated, status, chart, appVersion] = fields;
         result += `${name.padEnd(20)} ${namespace.padEnd(15)} ${revision.padEnd(8)} ${status.padEnd(12)} ${chart.padEnd(30)} ${appVersion || 'N/A'}\n`;
       } else {
-        // If field is insufficient, directly display the original line
         result += `${line}\n`;
       }
     });
 
-    // Add additional information
-    result += `\nNotes:\n`;
-    result += `• NAME: Release name\n`;
-    result += `• NAMESPACE: Deployed namespace\n`;
-    result += `• REVISION: Revision number\n`;
-    result += `• STATUS: Deployment status\n`;
-    result += `• CHART: Used Chart name and version\n`;
-    result += `• APP VERSION: Application version\n\n`;
+    // verbose 模式才顯示詳細說明
+    if (outputMode === 'verbose') {
+      result += `\nNotes:\n`;
+      result += `• NAME: Release name\n`;
+      result += `• NAMESPACE: Deployed namespace\n`;
+      result += `• REVISION: Revision number\n`;
+      result += `• STATUS: Deployment status\n`;
+      result += `• CHART: Used Chart name and version\n`;
+      result += `• APP VERSION: Application version\n\n`;
 
-    result += `Tips:\n`;
-    result += `• Use helm_status to view release detailed status\n`;
-    result += `• Use helm_get_values to view release configuration values\n`;
-    result += `• Use helm_history to view release history\n`;
+      result += `Tips:\n`;
+      result += `• Use helm_status to view release detailed status\n`;
+      result += `• Use helm_get_values to view release configuration values\n`;
+      result += `• Use helm_history to view release history\n`;
+    }
 
     return result;
   }

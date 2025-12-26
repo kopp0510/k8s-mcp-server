@@ -3,7 +3,7 @@
  * List all available Kubernetes clusters with their configurations and status
  */
 
-import { BaseTool } from './base-tool.js';
+import { BaseTool, OUTPUT_MODES, DEFAULT_OUTPUT_MODE } from './base-tool.js';
 import { clusterManager } from '../utils/cluster-manager.js';
 
 export class ClusterListTool extends BaseTool {
@@ -28,6 +28,11 @@ export class ClusterListTool extends BaseTool {
             type: 'boolean',
             description: 'Include cluster manager statistics',
             default: false
+          },
+          outputMode: {
+            type: 'string',
+            enum: ['compact', 'normal', 'verbose'],
+            description: 'Output detail level: compact (minimal), normal (balanced), verbose (full with usage tips). Default from MCP_OUTPUT_MODE env',
           }
         },
         required: []
@@ -37,7 +42,7 @@ export class ClusterListTool extends BaseTool {
 
   async execute(args) {
     try {
-      const { format = 'detailed', includeStats = false } = args;
+      const { format = 'detailed', includeStats = false, outputMode = DEFAULT_OUTPUT_MODE } = args;
 
       // Validate input
       this.validateInput(args);
@@ -54,11 +59,11 @@ export class ClusterListTool extends BaseTool {
           result = this.formatJsonOutput(clusters, defaultCluster, currentCluster, stats);
           break;
         case 'table':
-          result = this.formatTableOutput(clusters, defaultCluster, currentCluster, stats);
+          result = this.formatTableOutput(clusters, defaultCluster, currentCluster, stats, outputMode);
           break;
         case 'detailed':
         default:
-          result = this.formatDetailedOutput(clusters, defaultCluster, currentCluster, stats);
+          result = this.formatDetailedOutput(clusters, defaultCluster, currentCluster, stats, outputMode);
           break;
       }
 
@@ -86,7 +91,19 @@ export class ClusterListTool extends BaseTool {
   /**
    * Format detailed output
    */
-  formatDetailedOutput(clusters, defaultCluster, currentCluster, stats) {
+  formatDetailedOutput(clusters, defaultCluster, currentCluster, stats, outputMode = 'normal') {
+    // compact 模式：極簡輸出
+    if (outputMode === 'compact') {
+      let result = `Clusters: ${Object.keys(clusters).length} | Default: ${defaultCluster} | Current: ${currentCluster}\n`;
+      for (const [id, cluster] of Object.entries(clusters)) {
+        const flags = [];
+        if (id === currentCluster) flags.push('*');
+        if (id === defaultCluster) flags.push('D');
+        result += `  ${id} [${cluster.type.toUpperCase()}]${flags.length ? ' ' + flags.join('') : ''}\n`;
+      }
+      return result;
+    }
+
     let result = 'Available Kubernetes Clusters\n';
     result += '='.repeat(50) + '\n\n';
 
@@ -107,13 +124,19 @@ export class ClusterListTool extends BaseTool {
       result += `**${cluster.name}**${status}\n`;
       result += `  ID: ${id}\n`;
       result += `  Type: ${cluster.type.toUpperCase()}\n`;
-      result += `  Description: ${cluster.description}\n`;
+
+      // normal 和 verbose 模式顯示詳細資訊
+      if (outputMode === 'verbose') {
+        result += `  Description: ${cluster.description}\n`;
+      }
 
       if (cluster.type === 'gke') {
         result += `  Project: ${cluster.project}\n`;
         result += `  Cluster: ${cluster.cluster}\n`;
         result += `  Region: ${cluster.region}\n`;
-        result += `  Key File: ${cluster.keyFile}\n`;
+        if (outputMode === 'verbose') {
+          result += `  Key File: ${cluster.keyFile}\n`;
+        }
       } else if (cluster.type === 'local') {
         result += `  Kubeconfig: ${cluster.kubeconfig}\n`;
         if (cluster.context) {
@@ -129,23 +152,25 @@ export class ClusterListTool extends BaseTool {
       result += this.formatStatsSection(stats);
     }
 
-    // Usage guidelines
-    result += `**Usage Guidelines:**\n`;
-    result += `• All kubectl and helm tools support optional 'cluster' parameter\n`;
-    result += `• For GKE clusters, authentication happens automatically when switching\n`;
-    result += `• Local clusters use the mounted kubeconfig file\n`;
-    result += `• Use gke_auth tool for manual GKE authentication if needed\n\n`;
+    // verbose 模式才顯示使用指南、範例和工具清單
+    if (outputMode === 'verbose') {
+      result += `**Usage Guidelines:**\n`;
+      result += `• All kubectl and helm tools support optional 'cluster' parameter\n`;
+      result += `• For GKE clusters, authentication happens automatically when switching\n`;
+      result += `• Local clusters use the mounted kubeconfig file\n`;
+      result += `• Use gke_auth tool for manual GKE authentication if needed\n\n`;
 
-    result += `**Examples:**\n`;
-    result += `• List pods in default cluster: {"resource": "pods"}\n`;
-    result += `• List pods in specific cluster: {"resource": "pods", "cluster": "${Object.keys(clusters)[0]}"}\n`;
-    result += `• Switch and list: Use gke_auth first, then kubectl operations\n\n`;
+      result += `**Examples:**\n`;
+      result += `• List pods in default cluster: {"resource": "pods"}\n`;
+      result += `• List pods in specific cluster: {"resource": "pods", "cluster": "${Object.keys(clusters)[0]}"}\n`;
+      result += `• Switch and list: Use gke_auth first, then kubectl operations\n\n`;
 
-    result += `**Available Tools:**\n`;
-    result += `• cluster_list - List available clusters (this tool)\n`;
-    result += `• gke_auth - Authenticate to GKE cluster\n`;
-    result += `• All kubectl_* tools support cluster parameter\n`;
-    result += `• All helm_* tools support cluster parameter\n`;
+      result += `**Available Tools:**\n`;
+      result += `• cluster_list - List available clusters (this tool)\n`;
+      result += `• gke_auth - Authenticate to GKE cluster\n`;
+      result += `• All kubectl_* tools support cluster parameter\n`;
+      result += `• All helm_* tools support cluster parameter\n`;
+    }
 
     return result;
   }
@@ -153,7 +178,20 @@ export class ClusterListTool extends BaseTool {
   /**
    * Format table output
    */
-  formatTableOutput(clusters, defaultCluster, currentCluster, stats) {
+  formatTableOutput(clusters, defaultCluster, currentCluster, stats, outputMode = 'normal') {
+    // compact 模式：只顯示表格
+    if (outputMode === 'compact') {
+      let result = 'ID'.padEnd(15) + 'Type'.padEnd(8) + 'Status\n';
+      result += '-'.repeat(35) + '\n';
+      for (const [id, cluster] of Object.entries(clusters)) {
+        const isDefault = id === defaultCluster;
+        const isCurrent = id === currentCluster;
+        let status = isCurrent && isDefault ? '*D' : isCurrent ? '*' : isDefault ? 'D' : '-';
+        result += id.padEnd(15) + cluster.type.toUpperCase().padEnd(8) + status + '\n';
+      }
+      return result;
+    }
+
     let result = 'Kubernetes Clusters Summary\n';
     result += '='.repeat(50) + '\n\n';
 
@@ -190,11 +228,14 @@ export class ClusterListTool extends BaseTool {
       result += this.formatStatsSection(stats);
     }
 
+    // normal 模式顯示簡短參考；verbose 模式顯示完整參考
     result += `**Quick Reference:**\n`;
     result += `• Total clusters: ${Object.keys(clusters).length}\n`;
     result += `• Default: ${defaultCluster}\n`;
     result += `• Current: ${currentCluster}\n`;
-    result += `• Use cluster parameter in kubectl/helm tools to specify target\n`;
+    if (outputMode === 'verbose') {
+      result += `• Use cluster parameter in kubectl/helm tools to specify target\n`;
+    }
 
     return result;
   }
