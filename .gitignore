@@ -33,10 +33,10 @@ pids/
 # === IDE 和編輯器 ===
 .vscode/
 .idea/
+.cursor/
 *.swp
 *.swo
 *~
-.cursorignore
 
 # === 作業系統檔案 ===
 .DS_Store
