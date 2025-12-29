@@ -9,6 +9,7 @@ import express from 'express';
 import { z } from 'zod';
 import { logger } from './utils/logger.js';
 import { PrerequisiteError } from './tools/base-tool.js';
+import { clusterManager } from './utils/cluster-manager.js';
 
 // Import tool classes
 import { KubectlGetTool } from './tools/kubectl-get.js';
@@ -33,6 +34,51 @@ import { HelmHistoryTool } from './tools/helm-history.js';
 // Import cluster management tools
 import { ClusterListTool } from './tools/cluster-list.js';
 import { GkeAuthTool } from './tools/gke-auth.js';
+
+/**
+ * 動態注入叢集清單到工具的 cluster 參數
+ * 讓 AI 知道有哪些叢集可選擇
+ * @param {Object} schema - 工具的 inputSchema
+ * @returns {Object} 處理後的 inputSchema
+ */
+function injectClusterEnum(schema) {
+  // 如果沒有 cluster 參數，直接返回
+  if (!schema?.properties?.cluster) {
+    return schema;
+  }
+
+  try {
+    const clusters = clusterManager.getClusters();
+    const clusterIds = Object.keys(clusters);
+    const defaultCluster = clusterManager.clusters.default;
+
+    // 生成叢集清單說明
+    const clusterDescriptions = clusterIds.map(id => {
+      const cluster = clusters[id];
+      return `${id} (${cluster.name})`;
+    }).join(', ');
+
+    // 深拷貝 schema 避免修改原始物件
+    const newSchema = JSON.parse(JSON.stringify(schema));
+
+    // 注入 enum 和更新 description
+    newSchema.properties.cluster = {
+      ...newSchema.properties.cluster,
+      enum: clusterIds,
+      description: `Target cluster ID. Available: ${clusterDescriptions}. Default: ${defaultCluster}`
+    };
+
+    logger.debug('Injected cluster enum to tool schema', {
+      availableClusters: clusterIds,
+      defaultCluster
+    });
+
+    return newSchema;
+  } catch (error) {
+    logger.warn('Failed to inject cluster enum', { error: error.message });
+    return schema;
+  }
+}
 
 /**
  * Create and configure MCP Server
@@ -68,177 +114,55 @@ function setupMCPServer() {
   const clusterListTool = new ClusterListTool();
   const gkeAuthTool = new GkeAuthTool();
 
-  // Register tools to MCP Server
-  server.tool(
-    kubectlGetTool.name,
-    kubectlGetTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlGetTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlLogsTool.name,
-    kubectlLogsTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlLogsTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlDescribeTool.name,
-    kubectlDescribeTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlDescribeTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlClusterInfoTool.name,
-    kubectlClusterInfoTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlClusterInfoTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlGetYamlTool.name,
-    kubectlGetYamlTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlGetYamlTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlTopNodesTool.name,
-    kubectlTopNodesTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlTopNodesTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlTopPodsTool.name,
-    kubectlTopPodsTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlTopPodsTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlTopContainersTool.name,
-    kubectlTopContainersTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlTopContainersTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlScaleDeploymentTool.name,
-    kubectlScaleDeploymentTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlScaleDeploymentTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlRestartDeploymentTool.name,
-    kubectlRestartDeploymentTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlRestartDeploymentTool.execute(args);
-    }
-  );
-
-  server.tool(
-    kubectlEditHpaTool.name,
-    kubectlEditHpaTool.getDefinition().inputSchema,
-    async (args) => {
-      return await kubectlEditHpaTool.execute(args);
-    }
-  );
-
-  // Register Helm tools to MCP Server
-  server.tool(
-    helmListTool.name,
-    helmListTool.getDefinition().inputSchema,
-    async (args) => {
-      return await helmListTool.execute(args);
-    }
-  );
-
-  server.tool(
-    helmStatusTool.name,
-    helmStatusTool.getDefinition().inputSchema,
-    async (args) => {
-      return await helmStatusTool.execute(args);
-    }
-  );
-
-  server.tool(
-    helmRepoListTool.name,
-    helmRepoListTool.getDefinition().inputSchema,
-    async (args) => {
-      return await helmRepoListTool.execute(args);
-    }
-  );
-
-  server.tool(
-    helmGetValuesTool.name,
-    helmGetValuesTool.getDefinition().inputSchema,
-    async (args) => {
-      return await helmGetValuesTool.execute(args);
-    }
-  );
-
-  server.tool(
-    helmHistoryTool.name,
-    helmHistoryTool.getDefinition().inputSchema,
-    async (args) => {
-      return await helmHistoryTool.execute(args);
-    }
-  );
-
-  // Register cluster management tools to MCP Server
-  server.tool(
-    clusterListTool.name,
-    clusterListTool.getDefinition().inputSchema,
-    async (args) => {
-      return await clusterListTool.execute(args);
-    }
-  );
-
-  server.tool(
-    gkeAuthTool.name,
-    gkeAuthTool.getDefinition().inputSchema,
-    async (args) => {
-      return await gkeAuthTool.execute(args);
-    }
-  );
-
-  // Create available tools list
-  const availableTools = [
+  // 收集所有工具實例，統一處理
+  const allTools = [
     // Kubectl tools
-    kubectlGetTool.getDefinition(),
-    kubectlLogsTool.getDefinition(),
-    kubectlDescribeTool.getDefinition(),
-    kubectlClusterInfoTool.getDefinition(),
-    kubectlGetYamlTool.getDefinition(),
-    kubectlTopNodesTool.getDefinition(),
-    kubectlTopPodsTool.getDefinition(),
-    kubectlTopContainersTool.getDefinition(),
-    kubectlScaleDeploymentTool.getDefinition(),
-    kubectlRestartDeploymentTool.getDefinition(),
-    kubectlEditHpaTool.getDefinition(),
+    kubectlGetTool,
+    kubectlLogsTool,
+    kubectlDescribeTool,
+    kubectlClusterInfoTool,
+    kubectlGetYamlTool,
+    kubectlTopNodesTool,
+    kubectlTopPodsTool,
+    kubectlTopContainersTool,
+    kubectlScaleDeploymentTool,
+    kubectlRestartDeploymentTool,
+    kubectlEditHpaTool,
     // Helm tools
-    helmListTool.getDefinition(),
-    helmStatusTool.getDefinition(),
-    helmRepoListTool.getDefinition(),
-    helmGetValuesTool.getDefinition(),
-    helmHistoryTool.getDefinition(),
+    helmListTool,
+    helmStatusTool,
+    helmRepoListTool,
+    helmGetValuesTool,
+    helmHistoryTool,
     // Cluster management tools
-    clusterListTool.getDefinition(),
-    gkeAuthTool.getDefinition()
+    clusterListTool,
+    gkeAuthTool
   ];
+
+  // 統一註冊所有工具，並注入叢集清單到 cluster 參數
+  for (const tool of allTools) {
+    const definition = tool.getDefinition();
+    const schemaWithClusterEnum = injectClusterEnum(definition.inputSchema);
+
+    server.tool(
+      tool.name,
+      schemaWithClusterEnum,
+      async (args) => {
+        return await tool.execute(args);
+      }
+    );
+  }
+
+  logger.info('All tools registered with cluster enum injection');
+
+  // Create available tools list with cluster enum injected
+  const availableTools = allTools.map(tool => {
+    const definition = tool.getDefinition();
+    return {
+      ...definition,
+      inputSchema: injectClusterEnum(definition.inputSchema)
+    };
+  });
 
   return {
     server,

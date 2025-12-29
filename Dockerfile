@@ -47,20 +47,12 @@ RUN . /tmp/arch.env && \
     tar -xf google-cloud-cli-458.0.1-linux-${GCLOUD_ARCH}.tar.gz && \
     ./google-cloud-sdk/install.sh --quiet --path-update=false && \
     ./google-cloud-sdk/bin/gcloud components install gke-gcloud-auth-plugin --quiet && \
-    # 清理不需要的大型元件
+    # 只清理不需要的工具和平台元件（保留所有 lib 目錄，gcloud 執行必需）
     rm -rf google-cloud-sdk/.install \
            google-cloud-sdk/platform/bundledpythonunix \
-           google-cloud-sdk/lib/googlecloudsdk/generated_clients \
-           google-cloud-sdk/lib/third_party/grpc \
-           google-cloud-sdk/data/cli/*.json \
-           google-cloud-sdk/lib/surface \
            google-cloud-sdk/bin/anthoscli \
            google-cloud-sdk/bin/bq \
            google-cloud-sdk/bin/gsutil \
-           google-cloud-sdk/lib/third_party/apis \
-           google-cloud-sdk/lib/third_party/dulwich \
-           google-cloud-sdk/lib/third_party/fancy_urllib \
-           google-cloud-sdk/lib/third_party/httplib2 \
            google-cloud-sdk/platform/gsutil \
            google-cloud-sdk/platform/bq && \
     rm -rf google-cloud-cli-*.tar.gz && \
