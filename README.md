@@ -8,6 +8,8 @@ A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes a
 - **Dual Transport Mode** - Supports both SSE and Streamable HTTP transport protocols
 - **Kubernetes Integration** - Provides complete kubectl tool access
 - **Helm Support** - Provides Helm chart and release management functionality
+- **Multi-Cluster Support** - Local clusters and GKE clusters with automatic authentication
+- **Dynamic Cluster Injection** - Automatically injects available cluster list into tool schemas, enabling AI clients to recognize and select clusters
 - **Modular Architecture** - Clear separation between entry point and server implementation
 - **Error Handling** - Complete prerequisite checks and error propagation handling
 - **Security Protection** - Prevents dangerous operations in unauthenticated states
@@ -18,7 +20,7 @@ A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes a
 
 ## Version Information
 
-- **Current Version**: 2.1.4
+- **Current Version**: 2.2.0
 - **Completion Rate**: 100%
 - **Supported Tools**: 17 major tools
 - **Error Handling**: Complete refactoring
@@ -26,6 +28,7 @@ A simple, reliable MCP (Model Context Protocol) Server designed for Kubernetes a
 - **Security**: kubectl/helm dangerous operation prevention
 - **Dify Compatibility**: Full support for Streamable HTTP transport
 - **n8n Compatibility**: Full support for SSE transport
+- **Dynamic Cluster Injection**: Automatically inject available clusters into tool schemas
 
 ## File Structure
 
@@ -79,6 +82,7 @@ k8s-mcp-server/
 
 - **`src/server.js`** - Server implementation, responsible for:
   - MCP Server configuration and tool registration
+  - Dynamic cluster injection into tool schemas
   - Express application creation (SSE mode)
   - MCP message processing
   - SSE connection management

@@ -8,6 +8,7 @@
 - 17 個 MCP 工具（Kubectl 11 個、Helm 5 個、叢集管理 2 個）
 - 多傳輸模式：Stdio、SSE（n8n）、Streamable HTTP（Dify）
 - 多叢集支援：本地叢集、GKE 叢集
+- **動態叢集注入**：自動將可用叢集清單注入工具 schema，讓 AI 客戶端自動識別可選叢集
 - 資源監控、擴縮容、日誌查看等完整 K8s 管理功能
 
 ---
@@ -83,7 +84,7 @@
 k8s-mcp-server/
 ├── src/                          # 原始碼
 │   ├── index.js                  # 應用程式入口
-│   ├── server.js                 # MCP + Express 伺服器核心
+│   ├── server.js                 # MCP + Express 伺服器核心（含動態叢集注入）
 │   ├── tools/                    # MCP 工具模組 (17 個)
 │   │   ├── base-tool.js          # 工具基類
 │   │   ├── kubectl-*.js          # Kubectl 工具
